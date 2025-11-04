@@ -50,4 +50,3 @@ This repository contains both the backend API and the React frontend for the AI 
 4. Open the app at the URL shown in the terminal (typically `http://localhost:5173`).
 
 
-
