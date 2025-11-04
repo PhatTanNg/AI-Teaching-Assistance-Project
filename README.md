@@ -49,26 +49,7 @@ This repository contains both the backend API and the React frontend for the AI 
    ```
 4. Open the app at the URL shown in the terminal (typically `http://localhost:5173`).
 
-## Pushing to GitHub
 
-To publish this project to the GitHub repository [`PhatTanNguyen45/testing1`](https://github.com/PhatTanNguyen45/testing1):
-
-1. Make sure all changes are committed locally:
-   ```bash
-   git status
-   ```
-2. Add the GitHub remote (only needs to be done once):
-   ```bash
-   git remote add origin https://github.com/PhatTanNguyen45/testing1.git
-   ```
-   If a remote already exists, update it with:
-   ```bash
-   git remote set-url origin https://github.com/PhatTanNguyen45/testing1.git
-   ```
-3. Push the current branch to GitHub:
-   ```bash
-   git push -u origin HEAD
-   ```
 
 After pushing, you can clone the repository anywhere using:
 ```bash
