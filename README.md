@@ -51,7 +51,3 @@ This repository contains both the backend API and the React frontend for the AI 
 
 
 
-After pushing, you can clone the repository anywhere using:
-```bash
-git clone https://github.com/PhatTanNguyen45/testing1.git
-```
