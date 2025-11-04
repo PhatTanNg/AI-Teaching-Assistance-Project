@@ -8,13 +8,13 @@ const SignUp = () => {
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = async ({ username, email, password }) => {
+  const handleSubmit = async ({ username, email, password, displayName }) => {
     setError('');
     setIsSubmitting(true);
     try {
       await apiClient('/api/auth/signup', {
         method: 'POST',
-        data: { username, email, password },
+        data: { username, email, password, displayName },
       });
       navigate('/signin', { replace: true, state: { fromSignUp: true } });
     } catch (err) {

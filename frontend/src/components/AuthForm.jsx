@@ -7,6 +7,7 @@ const AuthForm = ({ mode = 'signin', onSubmit, isSubmitting, error }) => {
     password: '',
     username: '',
     email: '',
+    displayName: '',
   });
 
   const handleChange = (event) => {
@@ -16,13 +17,7 @@ const AuthForm = ({ mode = 'signin', onSubmit, isSubmitting, error }) => {
 
   const handleSubmit = (event) => {
     event.preventDefault();
-    if (isSignUp) {
-      const { username, email, password } = formValues;
-      onSubmit({ username, email, password });
-    } else {
-      const { usernameOrEmail, password } = formValues;
-      onSubmit({ usernameOrEmail, password });
-    }
+    onSubmit(formValues);
   };
 
   return (
@@ -36,6 +31,20 @@ const AuthForm = ({ mode = 'signin', onSubmit, isSubmitting, error }) => {
 
       {isSignUp ? (
         <>
+          <label className="form-label" htmlFor="displayName">
+            Display name
+          </label>
+          <input
+            id="displayName"
+            name="displayName"
+            type="text"
+            placeholder="Jordan Smith"
+            value={formValues.displayName}
+            onChange={handleChange}
+            required
+            className="form-input"
+          />
+
           <label className="form-label" htmlFor="username">
             Username
           </label>

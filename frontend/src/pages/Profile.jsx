@@ -49,6 +49,10 @@ const Profile = () => {
         </div>
         <dl className="profile-grid">
           <div>
+            <dt>Display name</dt>
+            <dd>{user.displayName}</dd>
+          </div>
+          <div>
             <dt>Username</dt>
             <dd>{user.username}</dd>
           </div>

@@ -16,7 +16,7 @@ const Header = () => {
       <nav className="app-nav">
         {isAuthenticated ? (
           <>
-            <span className="app-nav__user">Hi, {user?.username}</span>
+            <span className="app-nav__user">Hi, {user?.displayName ?? user?.username}</span>
             <button className="btn btn--ghost" onClick={logout} type="button">
               Log out
             </button>
