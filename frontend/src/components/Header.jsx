@@ -29,43 +29,41 @@ const Header = () => {
   const { isAuthenticated, logout, user } = useAuth();
 
   return (
-    <header className="app-header" role="banner">
-      <div className="app-header__inner">
-        <Link to="/" className="app-header__brand" aria-label="AI Teaching Assistant home">
-          <div className="logo" aria-hidden="true">
-            AI
-          </div>
-          <div>
-            <p className="app-title">AI Teaching Assistant</p>
-            <p className="app-subtitle">Empower your study sessions</p>
-          </div>
-        </Link>
-        <div className="app-header__actions">
-          <nav className="app-nav" aria-label="Primary navigation">
-            {(isAuthenticated ? authedLinks : unauthLinks).map((link) =>
-              renderLink(link),
-            )}
-          </nav>
-          {isAuthenticated ? (
-            <div className="app-nav__controls">
-              <span className="app-nav__user">
-                Hi, {user?.displayName ?? user?.username}
-              </span>
-              <button className="btn btn--ghost" onClick={logout} type="button">
-                Log out
-              </button>
-            </div>
-          ) : (
-            <div className="app-nav__controls">
-              <Link className="btn btn--ghost" to="/signin">
-                Sign in
-              </Link>
-              <Link className="btn" to="/signup">
-                Create account
-              </Link>
-            </div>
-          )}
+    <header className="app-header">
+      <div className="app-header__brand">
+        <div className="logo" aria-hidden="true">
+          AI
         </div>
+        <div>
+          <p className="app-title">AI Teaching Assistant</p>
+          <p className="app-subtitle">Empower your study sessions</p>
+        </div>
+      </div>
+      <div className="app-header__actions">
+        <nav className="app-nav" aria-label="Primary navigation">
+          {(isAuthenticated ? authedLinks : unauthLinks).map((link) =>
+            renderLink(link),
+          )}
+        </nav>
+        {isAuthenticated ? (
+          <div className="app-nav__controls">
+            <span className="app-nav__user">
+              Hi, {user?.displayName ?? user?.username}
+            </span>
+            <button className="btn btn--ghost" onClick={logout} type="button">
+              Log out
+            </button>
+          </div>
+        ) : (
+          <div className="app-nav__controls">
+            <Link className="btn btn--ghost" to="/signin">
+              Sign in
+            </Link>
+            <Link className="btn" to="/signup">
+              Create account
+            </Link>
+          </div>
+        )}
       </div>
     </header>
   );
