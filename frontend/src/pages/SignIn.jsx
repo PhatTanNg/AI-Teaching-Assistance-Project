@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import AuthForm from '../components/AuthForm.jsx';
 import { apiClient } from '../api/client.js';
 import { useAuth } from '../context/AuthContext.jsx';
+import { Container } from '../components/ui/container';
 
 const SignIn = () => {
   const navigate = useNavigate();
@@ -28,12 +29,17 @@ const SignIn = () => {
   };
 
   return (
-    <div className="page">
-      <AuthForm error={error} isSubmitting={isSubmitting} mode="signin" onSubmit={handleSubmit} />
-      <p className="card__meta">
-        Don&apos;t have an account? <Link to="/signup">Create one</Link>.
-      </p>
-    </div>
+    <Container>
+      <div className="w-full max-w-md space-y-4">
+        <AuthForm error={error} isSubmitting={isSubmitting} mode="signin" onSubmit={handleSubmit} />
+        <p className="text-center text-sm text-muted-foreground">
+          Don&apos;t have an account?{" "}
+          <Link to="/signup" className="underline underline-offset-4 hover:text-primary">
+            Create one
+          </Link>
+        </p>
+      </div>
+    </Container>
   );
 };
 
