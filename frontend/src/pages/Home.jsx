@@ -1,108 +1,166 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
-import { Mic, FileText, BookMarked, Sparkles, ArrowRight } from 'lucide-react';
-import { Button } from '../components/ui/button';
+import {
+  ArrowRight,
+  BookMarked,
+  FileText,
+  Highlighter,
+  Mic,
+  NotebookPen,
+  Sparkles,
+} from 'lucide-react';
+
+const heroHighlights = [
+  {
+    icon: Mic,
+    title: 'Live transcription',
+    description: 'Convert speech to text in real time with high accuracy.',
+  },
+  {
+    icon: Sparkles,
+    title: 'Smart keywords',
+    description: 'Automatically highlight the concepts you need to review.',
+  },
+  {
+    icon: Highlighter,
+    title: 'Definition lookup',
+    description: 'See key terms and their definitions without leaving class.',
+  },
+];
+
+const panelFeatures = [
+  {
+    icon: Mic,
+    title: 'Live Transcription',
+    description: 'Follow along as your lecture becomes readable notes instantly.',
+  },
+  {
+    icon: Sparkles,
+    title: 'Keyword Highlighting',
+    description: 'Important topics are surfaced and saved for effortless studying later.',
+  },
+  {
+    icon: NotebookPen,
+    title: 'AI Study Summaries',
+    description: 'Receive concise recaps of every session to kick-start revision.',
+  },
+];
+
+const quickLinks = [
+  {
+    to: '/transcripts',
+    title: 'View Transcripts',
+    description: 'Browse every lecture you have captured so far.',
+    icon: FileText,
+  },
+  {
+    to: '/keywords',
+    title: 'Saved Keywords',
+    description: 'Revisit highlighted concepts and their definitions.',
+    icon: BookMarked,
+  },
+];
 
 const Home = () => {
   const { isAuthenticated, user } = useAuth();
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
-      <div className="container mx-auto px-4 py-16">
-        <div className="text-center max-w-3xl mx-auto mb-16">
-          <h1 className="text-gray-900 mb-4">
-            {isAuthenticated 
-              ? `Welcome back, ${user?.displayName ?? user?.username}!` 
+    <div className="home">
+      <div className="home__layout">
+        <section className="home__hero" aria-labelledby="home-hero-title">
+          <div className="home__hero-badge" aria-hidden="true">
+            <span className="home__hero-dot" />
+            AI Teaching Assistant
+          </div>
+          <h1 id="home-hero-title" className="home__title">
+            {isAuthenticated
+              ? `Welcome back, ${user?.displayName ?? user?.username}!`
               : 'Never Miss a Lecture Again'}
           </h1>
-          <p className="text-xl text-gray-600 mb-8">
-            Real-time lecture transcription with AI-powered keyword highlighting. 
+          <p className="home__subtitle">
+            Real-time lecture transcription with AI-powered keyword highlighting.
             Capture every important moment and review key concepts anytime.
           </p>
-          {isAuthenticated ? (
-            <Link to="/transcribe">
-              <Button size="lg" className="gap-2">
-                <Mic className="h-5 w-5" />
-                Start Transcribing
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-            </Link>
-          ) : (
-            <Link to="/signup">
-              <Button size="lg" className="gap-2">
-                Get Started Free
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-            </Link>
+          <div className="home__actions">
+            {isAuthenticated ? (
+              <Link className="btn home__cta" to="/transcribe">
+                Start a live session
+                <ArrowRight className="home__cta-icon" aria-hidden="true" />
+              </Link>
+            ) : (
+              <>
+                <Link className="btn home__cta" to="/signup">
+                  Get started free
+                  <ArrowRight className="home__cta-icon" aria-hidden="true" />
+                </Link>
+                <Link className="btn btn--ghost" to="/signin">
+                  Sign in
+                </Link>
+              </>
+            )}
+          </div>
+          <ul className="home__feature-list">
+            {heroHighlights.map(({ icon: Icon, title, description }) => (
+              <li key={title} className="home__feature-item">
+                <span className="home__feature-icon" aria-hidden="true">
+                  <Icon size={18} />
+                </span>
+                <div>
+                  <p className="home__feature-item-title">{title}</p>
+                  <p className="home__feature-item-text">{description}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <aside className="home__panel" aria-label="Feature preview">
+          <div className="home__panel-header">
+            <div className="home__panel-chip">Classroom session</div>
+            <p className="home__panel-title">AI tools working while you teach</p>
+            <p className="home__panel-text">
+              Transcribe, highlight, and summarise every lecture from one simple
+              workspace.
+            </p>
+          </div>
+          <div className="home__panel-cards">
+            {panelFeatures.map(({ icon: Icon, title, description }) => (
+              <div key={title} className="home__panel-card">
+                <span className="home__panel-icon" aria-hidden="true">
+                  <Icon size={20} />
+                </span>
+                <div>
+                  <p className="home__panel-card-title">{title}</p>
+                  <p className="home__panel-card-text">{description}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+          {!isAuthenticated && (
+            <p className="home__panel-cta">
+              Already have an account?{' '}
+              <Link to="/signin">Sign in to your dashboard</Link>
+            </p>
           )}
-        </div>
-
-        <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-          <div className="bg-white p-6 rounded-xl shadow-sm border">
-            <div className="h-12 w-12 rounded-lg bg-blue-100 flex items-center justify-center mb-4">
-              <Mic className="h-6 w-6 text-blue-600" />
-            </div>
-            <h3 className="text-gray-900 mb-2">Live Transcription</h3>
-            <p className="text-gray-600">
-              Convert speech to text in real-time during your lectures with high accuracy
-            </p>
-          </div>
-
-          <div className="bg-white p-6 rounded-xl shadow-sm border">
-            <div className="h-12 w-12 rounded-lg bg-purple-100 flex items-center justify-center mb-4">
-              <Sparkles className="h-6 w-6 text-purple-600" />
-            </div>
-            <h3 className="text-gray-900 mb-2">Smart Keywords</h3>
-            <p className="text-gray-600">
-              Automatically highlight important terms and concepts for quick reference
-            </p>
-          </div>
-
-          <div className="bg-white p-6 rounded-xl shadow-sm border">
-            <div className="h-12 w-12 rounded-lg bg-indigo-100 flex items-center justify-center mb-4">
-              <BookMarked className="h-6 w-6 text-indigo-600" />
-            </div>
-            <h3 className="text-gray-900 mb-2">Definition Lookup</h3>
-            <p className="text-gray-600">
-              Save keywords and find their definitions later for better understanding
-            </p>
-          </div>
-        </div>
-
-        {isAuthenticated && (
-          <div className="mt-16 max-w-5xl mx-auto grid md:grid-cols-2 gap-6">
-            <Link to="/transcripts" className="group">
-              <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="h-10 w-10 rounded-lg bg-green-100 flex items-center justify-center">
-                    <FileText className="h-5 w-5 text-green-600" />
-                  </div>
-                  <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-gray-600 group-hover:translate-x-1 transition-all" />
-                </div>
-                <h3 className="text-gray-900 mb-1">View Transcripts</h3>
-                <p className="text-sm text-gray-600">
-                  Access all your past lecture transcriptions
-                </p>
-              </div>
-            </Link>
-
-            <Link to="/keywords" className="group">
-              <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="h-10 w-10 rounded-lg bg-orange-100 flex items-center justify-center">
-                    <BookMarked className="h-5 w-5 text-orange-600" />
-                  </div>
-                  <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-gray-600 group-hover:translate-x-1 transition-all" />
-                </div>
-                <h3 className="text-gray-900 mb-1">Saved Keywords</h3>
-                <p className="text-sm text-gray-600">
-                  Review your highlighted terms and definitions
-                </p>
-              </div>
-            </Link>
-          </div>
-        )}
+        </aside>
       </div>
+
+      {isAuthenticated && (
+        <section className="home__quick-links" aria-label="Quick links">
+          {quickLinks.map(({ to, title, description, icon: Icon }) => (
+            <Link key={to} className="home__quick-card" to={to}>
+              <div className="home__quick-card-icon" aria-hidden="true">
+                <Icon size={22} />
+              </div>
+              <div className="home__quick-card-content">
+                <h3>{title}</h3>
+                <p>{description}</p>
+              </div>
+              <ArrowRight className="home__quick-card-arrow" aria-hidden="true" />
+            </Link>
+          ))}
+        </section>
+      )}
     </div>
   );
 };
