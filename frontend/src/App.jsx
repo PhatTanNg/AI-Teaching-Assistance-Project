@@ -10,24 +10,6 @@ import Keywords from './pages/Keywords.jsx';
 
 export default function App() {
   return (
-<<<<<<< HEAD
-    <div className="min-h-screen bg-white">
-      <Header />
-      <main className="flex-1">
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/signin" element={<SignIn />} />
-          <Route path="/signup" element={<SignUp />} />
-
-          {/* Protected Routes */}
-          <Route element={<ProtectedRoute />}>
-            <Route path="/transcribe" element={<Transcribe />} />
-            <Route path="/transcripts" element={<Transcripts />} />
-            <Route path="/keywords" element={<Keywords />} />
-          </Route>
-        </Routes>
-      </main>
-=======
     <div className="app-shell">
       <a href="#main-content" className="skip-link">
         Skip to main content
@@ -57,7 +39,6 @@ export default function App() {
           Need support? Reach out to your instructor or administrator for access.
         </p>
       </footer>
->>>>>>> 4af2ec74959e64b1e98761e1dc284df4a265c5a0
     </div>
   );
 }

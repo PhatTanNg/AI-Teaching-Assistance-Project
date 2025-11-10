@@ -38,7 +38,7 @@ const AuthForm = ({ mode = 'signin', onSubmit, isSubmitting, error }) => {
             id="displayName"
             name="displayName"
             type="text"
-            placeholder="Jordan Smith"
+            placeholder="Jackson Nguyen"
             value={formValues.displayName}
             onChange={handleChange}
             required
@@ -52,7 +52,7 @@ const AuthForm = ({ mode = 'signin', onSubmit, isSubmitting, error }) => {
             id="username"
             name="username"
             type="text"
-            placeholder="jordansmith"
+            placeholder="jacksonn"
             value={formValues.username}
             onChange={handleChange}
             required
@@ -84,7 +84,7 @@ const AuthForm = ({ mode = 'signin', onSubmit, isSubmitting, error }) => {
             id="usernameOrEmail"
             name="usernameOrEmail"
             type="text"
-            placeholder="jordansmith or you@example.com"
+            placeholder="jacksonn or you@example.com"
             value={formValues.usernameOrEmail}
             onChange={handleChange}
             required
