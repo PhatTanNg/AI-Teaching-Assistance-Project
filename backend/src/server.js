@@ -9,7 +9,7 @@ import transcribeRoute from "./routes/transcribeRoute.js";
 import { protectedRoute } from "./middlewares/authMiddleware.js";
 import http from 'http';
 import WebSocket, { WebSocketServer } from 'ws';
-import axios from 'axios';
+import { SpeechClient } from '@google-cloud/speech';
 
 dotenv.config();
 
@@ -45,13 +45,12 @@ app.use("/api/users",protectedRoute , userRoute);
 connectDB().then(() => {
   const server = http.createServer(app);
 
-  // WebSocket proxy endpoint for Deepgram realtime streaming
+
+  // WebSocket endpoint for Google Speech-to-Text streaming
   const wss = new WebSocketServer({ noServer: true });
 
   server.on('upgrade', (request, socket, head) => {
-    // log upgrade attempts for debugging
     console.log('Upgrade request for', request.url, 'from', request.socket.remoteAddress);
-    // only handle our realtime proxy path
     if (request.url && request.url.startsWith('/ws/realtime-proxy')) {
       try {
         wss.handleUpgrade(request, socket, head, (ws) => {
@@ -66,105 +65,59 @@ connectDB().then(() => {
     }
   });
 
-  // simple HTTP GET to verify backend is reachable at the websocket path
   app.get('/ws/realtime-proxy', (req, res) => {
     res.status(200).send('websocket proxy endpoint');
   });
 
   wss.on('connection', (clientWs, request) => {
     console.log('[WS] Client connected from', request.socket.remoteAddress);
-    // create a websocket to Deepgram with server-side API key
-    const deepgramKey = process.env.DEEPGRAM_API_KEY;
-    if (!deepgramKey) {
-      console.error('[WS] DEEPGRAM_API_KEY not set');
-      clientWs.send(JSON.stringify({ type: 'error', message: 'Server missing DEEPGRAM_API_KEY' }));
-      clientWs.close();
-      return;
+    const speechClient = new SpeechClient();
+
+    let recognizeStream = null;
+    let clientClosed = false;
+
+    // Start Google streaming recognize
+    function startRecognitionStream() {
+      recognizeStream = speechClient
+        .streamingRecognize({
+          config: {
+            encoding: 'LINEAR16',
+            sampleRateHertz: 16000,
+            languageCode: 'en-US',
+          },
+          interimResults: true,
+        })
+        .on('error', (err) => {
+          console.error('[Google] Streaming error:', err.message);
+          if (clientWs.readyState === WebSocket.OPEN) {
+            clientWs.send(JSON.stringify({ type: 'error', message: err.message }));
+          }
+        })
+        .on('data', (data) => {
+          if (clientWs.readyState === WebSocket.OPEN) {
+            const transcript = data.results
+              .map(r => r.alternatives[0].transcript)
+              .join(' ');
+            clientWs.send(JSON.stringify({ type: 'transcript', transcript, isFinal: !!data.results[0]?.isFinal }));
+          }
+        });
     }
 
-    // Use Deepgram realtime/listen websocket endpoint. Use 'listen' path for realtime audio.
-    const dgUrl = 'wss://api.deepgram.com/v1/listen?model=nova-2&language=en-US&sample_rate=16000&encoding=linear16';
-    console.log('[DG] Connecting to:', dgUrl);
-    const dgWs = new WebSocket(dgUrl, {
-      headers: {
-        Authorization: `Token ${deepgramKey}`,
-      },
-    });
-    // buffer messages from client until dgWs is open
-    const pendingMessages = [];
-    let clientDisconnected = false;
-
-    const isOpen = (s) => s && s.readyState === WebSocket.OPEN;
-
-    dgWs.on('open', () => {
-      console.log('[DG] Connection established');
-      // notify client if possible
-      if (isOpen(clientWs)) {
-        try { clientWs.send(JSON.stringify({ type: 'status', message: 'connected-to-deepgram' })); } catch (e) { console.warn('[DG] clientWs send failed on open', e); }
-      }
-      // flush pending messages
-      try {
-        if (pendingMessages.length > 0) {
-          console.log('[DG] Flushing', pendingMessages.length, 'pending messages');
-          for (const m of pendingMessages) {
-            if (isOpen(dgWs)) dgWs.send(m);
-          }
-        }
-      } catch (e) {
-        console.warn('[DG] Error flushing pending messages to Deepgram', e);
-      }
-      pendingMessages.length = 0;
-    });
-
-    dgWs.on('message', (msg) => {
-      // forward Deepgram messages to client
-      console.log('[DG] Received message from Deepgram, length:', msg.length);
-      try {
-        if (isOpen(clientWs)) {
-          clientWs.send(msg);
-          console.log('[DG] Forwarded message to client');
-        } else {
-          console.warn('[DG] clientWs not open, dropping message from Deepgram');
-        }
-      } catch (e) {
-        console.warn('[DG] Error forwarding message to client', e.message);
-      }
-    });
-
-    dgWs.on('close', (code, reason) => {
-      console.log('[DG] Connection closed with code', code, reason ? '(' + reason.toString() + ')' : '');
-      if (!clientDisconnected && isOpen(clientWs)) {
-        try { clientWs.close(4000, 'Deepgram connection closed'); } catch (e) { console.warn('[DG] Error closing clientWs after dg close', e); }
-      }
-    });
-
-    dgWs.on('error', (err) => {
-      console.error('[DG] Connection error', err && err.message);
-      try { if (isOpen(clientWs)) clientWs.send(JSON.stringify({ type: 'error', message: 'deepgram connection error', details: err.message })); } catch (e) { console.warn('[DG] Failed to notify client about error', e); }
-    });
+    startRecognitionStream();
 
     clientWs.on('message', (message) => {
-      // binary audio frames or control messages are forwarded to Deepgram
-      console.log('[WS] Received message from client, length:', message.length);
-      try {
-        if (isOpen(dgWs)) {
-          dgWs.send(message);
-          console.log('[WS] Forwarded message to Deepgram');
-        } else {
-          // buffer until open
-          console.log('[WS] Buffering message (Deepgram not open yet)');
-          pendingMessages.push(message);
-        }
-      } catch (e) {
-        console.warn('[WS] Error sending to Deepgram:', e.message);
-        pendingMessages.push(message);
-      }
+      // Expect binary PCM audio frames from client
+      if (!recognizeStream) return;
+      recognizeStream.write(message);
     });
 
     clientWs.on('close', () => {
-      clientDisconnected = true;
+      clientClosed = true;
+      if (recognizeStream) {
+        recognizeStream.end();
+        recognizeStream = null;
+      }
       console.log('[WS] Client disconnected');
-      try { dgWs.close(1000, 'Client disconnected'); } catch (e) {}
     });
 
     clientWs.on('error', (err) => {

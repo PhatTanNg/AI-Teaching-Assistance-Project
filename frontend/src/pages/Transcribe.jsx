@@ -190,21 +190,15 @@ const Transcribe = () => {
       };
 
       ws.onmessage = (evt) => {
-        // Deepgram responses are JSON strings
+        // Google Speech-to-Text responses are JSON strings
         try {
           const data = JSON.parse(evt.data);
-          // Attempt to extract transcript from known shapes
-          const transcriptText = data?.channel?.alternatives?.[0]?.transcript
-            || data?.is_final && data?.channel?.alternatives?.[0]?.transcript
-            || data?.type === 'transcript' && data?.transcript
-            || null;
-          if (transcriptText) {
-            // Append or update transcript on final
-            if (data?.is_final || data?.type === 'final') {
-              setTranscript(prev => (prev ? prev + '\n' : '') + transcriptText);
+          // Google backend sends { type: 'transcript', transcript, isFinal }
+          if (data.type === 'transcript' && data.transcript) {
+            if (data.isFinal) {
+              setTranscript(prev => (prev ? prev + '\n' : '') + data.transcript);
             } else {
-              // interim results: show inline (append)
-              setTranscript(prev => prev + '\n[Interim] ' + transcriptText);
+              setTranscript(prev => prev + '\n[Interim] ' + data.transcript);
             }
           }
         } catch (e) {

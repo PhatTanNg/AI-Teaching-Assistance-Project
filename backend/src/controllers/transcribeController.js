@@ -1,32 +1,51 @@
-import axios from 'axios';
 
+
+
+import { SpeechClient } from '@google-cloud/speech';
+
+// Supported file types for Google: wav, flac, mp3, mp4, m4a, amr, ogg, webm
 export const transcribe = async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ error: 'No audio file provided' });
+    if (!req.file) {
+      return res.status(400).json({ error: 'No audio file provided' });
+    }
 
-    const apiKey = process.env.DEEPGRAM_API_KEY;
-    if (!apiKey) return res.status(500).json({ error: 'Deepgram API key not configured' });
+    // Validate file type
+    const allowedTypes = [
+      'audio/wav', 'audio/x-wav', 'audio/flac', 'audio/mp3', 'audio/mp4', 'audio/m4a', 'audio/amr', 'audio/ogg', 'audio/webm'
+    ];
+    if (!allowedTypes.includes(req.file.mimetype)) {
+      return res.status(400).json({ error: 'Unsupported audio format. Please upload wav, flac, mp3, mp4, m4a, amr, ogg, or webm.' });
+    }
 
-    const url = 'https://api.deepgram.com/v1/listen?model=general&language=en-US';
+    // Google authentication: uses GOOGLE_APPLICATION_CREDENTIALS env var for service account JSON
+    const client = new SpeechClient();
 
-    const headers = {
-      Authorization: `Token ${apiKey}`,
-      'Content-Type': req.file.mimetype || 'application/octet-stream'
+    // Convert buffer to base64 string for Google API
+    const audioBytes = req.file.buffer.toString('base64');
+
+    const audio = {
+      content: audioBytes,
+    };
+    const config = {
+      encoding: 'LINEAR16', // or 'MP3', 'FLAC', etc. based on file type
+      sampleRateHertz: 16000,
+      languageCode: 'en-US',
     };
 
-    const response = await axios.post(url, req.file.buffer, {
-      headers,
-      responseType: 'json'
-    });
+    const request = {
+      audio,
+      config,
+    };
 
-    const transcript = response.data?.results?.channels?.[0]?.alternatives?.[0]?.transcript
-      || response.data?.channels?.[0]?.alternatives?.[0]?.transcript
-      || response.data?.results?.[0]?.alternatives?.[0]?.transcript
-      || '';
-
+    // Send request to Google Speech-to-Text
+    const [response] = await client.recognize(request);
+    const transcript = response.results
+      ? response.results.map(r => r.alternatives[0].transcript).join(' ')
+      : '';
     return res.json({ transcript });
   } catch (err) {
-    console.error('Deepgram transcription error:', err?.response?.data || err.message);
-    return res.status(500).json({ error: 'Transcription failed', details: err?.response?.data || err.message });
+    console.error('Google Speech-to-Text error:', err.message);
+    return res.status(500).json({ error: 'Transcription failed', details: err.message });
   }
 };
