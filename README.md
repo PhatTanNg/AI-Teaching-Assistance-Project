@@ -28,12 +28,15 @@ This repository contains both the backend API and the React frontend for the AI 
    REFRESH_TOKEN_SECRET=replace-with-another-strong-secret
    ```
    
-   If you plan to use Deepgram for speech-to-text, add your Deepgram API key here as well (do not commit this file):
-   ```env
-   # Add your Deepgram API key for transcription
-   DEEPGRAM_API_KEY=your_deepgram_api_key_here
-   ```
-   You can keep a safe template in the repo by creating and committing `backend/.env.example` with the same variable names but placeholder values.
+    For Google Cloud Speech-to-Text:
+    - Create a Google Cloud service account and download the JSON credentials file.
+    - On Render, upload the JSON file as a secret file and set `GOOGLE_APPLICATION_CREDENTIALS` to its path (e.g., `/etc/secrets/your-service-account.json`).
+    - Add to your `.env`:
+       ```env
+       GOOGLE_APPLICATION_CREDENTIALS=/etc/secrets/your-service-account.json
+       ```
+    - Do **not** commit this file to your repository.
+    You can keep a safe template in the repo by creating and committing `backend/.env.example` with the same variable names but placeholder values.
 3. Start the development server:
    ```bash
    npm run dev
