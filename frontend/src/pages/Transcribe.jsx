@@ -196,9 +196,9 @@ const Transcribe = () => {
           // Google backend sends { type: 'transcript', transcript, isFinal }
           if (data.type === 'transcript' && data.transcript) {
             if (data.isFinal) {
-              setTranscript(prev => (prev ? prev + '\n' : '') + data.transcript);
+              setTranscript(prev => data.transcript);
             } else {
-              setTranscript(prev => prev + '\n[Interim] ' + data.transcript);
+              setTranscript(prev => '[Interim] ' + data.transcript);
             }
           }
         } catch (e) {
