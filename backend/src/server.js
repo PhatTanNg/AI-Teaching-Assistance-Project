@@ -18,7 +18,10 @@ const PORT = process.env.PORT || 5001;
 
 //middleware
 app.use(cors({
-  origin: true,
+  origin: [
+    'https://ai-teaching-assistance-project.vercel.app',
+    'https://ai-teaching-assistance-project.onrender.com'
+  ],
   credentials: true
 }));
 app.use(cookieParser());
