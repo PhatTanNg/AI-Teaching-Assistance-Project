@@ -168,8 +168,9 @@ const Transcribe = () => {
     let stream = null; // declare at function scope to use in handlers
     try {
       // open websocket to backend proxy
-      const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-      const wsUrl = `${protocol}://${window.location.hostname}:5001/ws/realtime-proxy`;
+      // Always use VITE_API_BASE_URL for websocket (backend on Render)
+      const apiBase = import.meta.env.VITE_API_BASE_URL || 'https://ai-teaching-assistance-project.onrender.com';
+      const wsUrl = apiBase.replace(/^http/, 'ws') + '/ws/realtime-proxy';
       console.log('Connecting realtime websocket to', wsUrl);
       let ws;
       try {
