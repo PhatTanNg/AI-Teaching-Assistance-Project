@@ -263,7 +263,7 @@ const Transcribe = () => {
 
       // Voice Activity Detection (VAD) - only send audio when speech is detected
       let silenceCounter = 0;
-      const SILENCE_THRESHOLD = 0.02; // RMS amplitude threshold for speech detection
+      const SILENCE_THRESHOLD = 0.005; // Lower threshold for more sensitive speech detection
       const SILENCE_DURATION = 10; // frames of silence before stopping transmission
       let isSpeaking = false;
 
@@ -303,8 +303,10 @@ const Transcribe = () => {
             if (Math.random() < 0.1) {
               console.log('[AUDIO] Sent frame, size:', pcm16.byteLength, 'RMS:', rms.toFixed(4));
             }
-          } else if (!isSpeaking && Math.random() < 0.05) {
-            console.log('[AUDIO] Silence detected, RMS:', rms.toFixed(4));
+          } else {
+            if (Math.random() < 0.05) {
+              console.log('[AUDIO] Silence detected, RMS:', rms.toFixed(4));
+            }
           }
         } catch (e) {
           console.error('Error in audio processing:', e.message);
