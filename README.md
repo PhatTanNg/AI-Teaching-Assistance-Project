@@ -27,6 +27,13 @@ This repository contains both the backend API and the React frontend for the AI 
    ACCESS_TOKEN_SECRET=replace-with-a-strong-secret
    REFRESH_TOKEN_SECRET=replace-with-another-strong-secret
    ```
+   
+   If you plan to use Deepgram for speech-to-text, add your Deepgram API key here as well (do not commit this file):
+   ```env
+   # Add your Deepgram API key for transcription
+   DEEPGRAM_API_KEY=your_deepgram_api_key_here
+   ```
+   You can keep a safe template in the repo by creating and committing `backend/.env.example` with the same variable names but placeholder values.
 3. Start the development server:
    ```bash
    npm run dev

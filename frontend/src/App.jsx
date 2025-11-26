@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import Header from './components/Header.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import Home from './pages/Home.jsx';
@@ -28,6 +28,8 @@ export default function App() {
               <Route path="/transcripts" element={<Transcripts />} />
               <Route path="/keywords" element={<Keywords />} />
             </Route>
+            {/* Catch-all: redirect unknown routes to home (or change to a NotFound page) */}
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </div>
       </main>

@@ -47,6 +47,7 @@ const DEMO_LECTURE = [
 
 const Transcribe = () => {
   const [isRecording, setIsRecording] = useState(false);
+  const [isDeepgramRecording, setIsDeepgramRecording] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [keywords, setKeywords] = useState([]);
   const [selectedText, setSelectedText] = useState('');
@@ -54,7 +55,18 @@ const Transcribe = () => {
   const [browserSupported, setBrowserSupported] = useState(true);
   const [demoMode, setDemoMode] = useState(false);
   const recognitionRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const mediaStreamRef = useRef(null);
   const demoIntervalRef = useRef(null);
+  const wsRef = useRef(null);
+  const audioContextRef = useRef(null);
+  const sourceNodeRef = useRef(null);
+  const processorRef = useRef(null);
+  const [isRealtimeStreaming, setIsRealtimeStreaming] = useState(false);
+  const userRequestedStopRef = useRef(false);
+  const reconnectAttemptsRef = useRef(0);
+  const reconnectTimerRef = useRef(null);
 
   useEffect(() => {
     // Check if browser supports Speech Recognition
@@ -87,10 +99,9 @@ const Transcribe = () => {
     };
 
     recognition.onerror = (event) => {
+      // Ignore noisy 'no-speech' errors (often harmless)
+      if (event.error === 'no-speech') return;
       console.error('Speech recognition error:', event.error);
-      if (event.error === 'no-speech') {
-        return;
-      }
       setIsRecording(false);
     };
 
@@ -123,15 +134,13 @@ const Transcribe = () => {
       }
 
       const demoWord = DEMO_LECTURE[currentIndex];
-      
       // Add word to transcript
       setTranscript(prev => prev + demoWord.word + ' ');
-      
+
       // Add keyword if it's marked as one
       if (demoWord.isKeyword) {
         setKeywords(prev => {
           const cleanWord = demoWord.word.replace(/[.,!?;]$/, '');
-          // Avoid duplicates
           if (!prev.find(k => k.text === cleanWord)) {
             return [...prev, {
               text: cleanWord,
@@ -142,23 +151,246 @@ const Transcribe = () => {
           return prev;
         });
       }
-      
+
       currentIndex++;
     }, 400);
-
     return () => {
       if (demoIntervalRef.current) {
         clearInterval(demoIntervalRef.current);
+        demoIntervalRef.current = null;
       }
+      setIsRecording(false);
+      setDemoMode(false);
     };
   }, [demoMode]);
 
-  const startRecording = () => {
-    if (recognitionRef.current) {
-      setTranscript('');
-      setKeywords([]);
-      recognitionRef.current.start();
-      setIsRecording(true);
+  const startRealtimeStream = async () => {
+    let stream = null; // declare at function scope to use in handlers
+    try {
+      // open websocket to backend proxy
+      const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+      const wsUrl = `${protocol}://${window.location.hostname}:5001/ws/realtime-proxy`;
+      console.log('Connecting realtime websocket to', wsUrl);
+      let ws;
+      try {
+        ws = new WebSocket(wsUrl);
+      } catch (err) {
+        console.error('Failed to create WebSocket', err);
+        throw err;
+      }
+      wsRef.current = ws;
+      ws.binaryType = 'arraybuffer';
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        console.log('WebSocket opened, starting audio capture');
+        setIsRealtimeStreaming(true);
+        setTranscript(prev => prev + '\n[Realtime connected]');
+      };
+
+      ws.onmessage = (evt) => {
+        // Deepgram responses are JSON strings
+        try {
+          const data = JSON.parse(evt.data);
+          // Attempt to extract transcript from known shapes
+          const transcriptText = data?.channel?.alternatives?.[0]?.transcript
+            || data?.is_final && data?.channel?.alternatives?.[0]?.transcript
+            || data?.type === 'transcript' && data?.transcript
+            || null;
+          if (transcriptText) {
+            // Append or update transcript on final
+            if (data?.is_final || data?.type === 'final') {
+              setTranscript(prev => (prev ? prev + '\n' : '') + transcriptText);
+            } else {
+              // interim results: show inline (append)
+              setTranscript(prev => prev + '\n[Interim] ' + transcriptText);
+            }
+          }
+        } catch (e) {
+          // If binary or unexpected message, ignore for now
+        }
+      };
+
+      ws.onerror = (e) => {
+        console.error('Realtime WS error event:', e);
+        console.error('WebSocket readyState:', ws.readyState);
+        setTranscript(prev => prev + '\n[Error: ' + (e?.message || 'WebSocket error') + ']');
+      };
+
+      ws.onclose = (event) => {
+        console.log('Realtime WS close event - code:', event.code, 'reason:', event.reason);
+        console.log('[DEBUG] Cleaning up audio resources after close');
+        setIsRealtimeStreaming(false);
+        setTranscript(prev => prev + '\n[Realtime disconnected - code ' + event.code + ']');
+        // cleanup audio nodes and streams
+        if (processorRef.current) {
+          try { processorRef.current.disconnect(); } catch (e) {}
+          processorRef.current = null;
+        }
+        if (sourceNodeRef.current) {
+          try { sourceNodeRef.current.disconnect(); } catch (e) {}
+          sourceNodeRef.current = null;
+        }
+        // Stop all audio tracks
+        if (stream) {
+          try {
+            console.log('[DEBUG] Stopping audio tracks');
+            stream.getTracks().forEach(track => track.stop());
+          } catch (e) {}
+        }
+        if (audioContextRef.current) {
+          try { audioContextRef.current.close(); } catch (e) {}
+          audioContextRef.current = null;
+        }
+      };
+
+      // start capturing audio
+      console.log('[DEBUG] Requesting microphone access...');
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      console.log('[DEBUG] Microphone access granted, sample rate:', stream.getTracks()[0].getSettings().sampleRate);
+      
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      audioContextRef.current = audioContext;
+      const source = audioContext.createMediaStreamSource(stream);
+      sourceNodeRef.current = source;
+
+      // Use ScriptProcessor for reliable audio capture
+      // Note: ScriptProcessor is deprecated but AudioWorklet has compatibility issues in some browsers
+      // A proper AudioWorklet would require external module files, so we use the proven ScriptProcessor
+      const processor = audioContext.createScriptProcessor(4096, 1, 1);
+      processorRef.current = processor;
+
+      // Voice Activity Detection (VAD) - only send audio when speech is detected
+      let silenceCounter = 0;
+      const SILENCE_THRESHOLD = 0.02; // RMS amplitude threshold for speech detection
+      const SILENCE_DURATION = 10; // frames of silence before stopping transmission
+      let isSpeaking = false;
+
+      // Helper: calculate RMS (root mean square) energy of audio frame
+      function calculateRMS(audioData) {
+        let sum = 0;
+        for (let i = 0; i < audioData.length; i++) {
+          sum += audioData[i] * audioData[i];
+        }
+        return Math.sqrt(sum / audioData.length);
+      }
+
+      processor.onaudioprocess = (event) => {
+        try {
+          const inputData = event.inputBuffer.getChannelData(0);
+          
+          // Calculate audio energy to detect speech
+          const rms = calculateRMS(inputData);
+          const hasSpeech = rms > SILENCE_THRESHOLD;
+
+          if (hasSpeech) {
+            silenceCounter = 0;
+            isSpeaking = true;
+          } else {
+            silenceCounter++;
+            if (silenceCounter >= SILENCE_DURATION) {
+              isSpeaking = false;
+            }
+          }
+
+          // Only send audio if we're detecting speech or still in grace period
+          if (isSpeaking && ws && ws.readyState === WebSocket.OPEN) {
+            const downsampled = downsampleBuffer(inputData, audioContext.sampleRate, 16000);
+            const pcm16 = floatTo16BitPCM(downsampled);
+            ws.send(pcm16);
+            // Log every 10th frame to avoid spam
+            if (Math.random() < 0.1) {
+              console.log('[AUDIO] Sent frame, size:', pcm16.byteLength, 'RMS:', rms.toFixed(4));
+            }
+          } else if (!isSpeaking && Math.random() < 0.05) {
+            console.log('[AUDIO] Silence detected, RMS:', rms.toFixed(4));
+          }
+        } catch (e) {
+          console.error('Error in audio processing:', e.message);
+        }
+      };
+
+      // Helper: downsample Float32Array from input sample rate to target sample rate
+      function downsampleBuffer(buffer, inputSampleRate, outputSampleRate) {
+        if (outputSampleRate === inputSampleRate) {
+          return buffer;
+        }
+        if (outputSampleRate > inputSampleRate) {
+          throw new Error('downsampling rate should be smaller than original sample rate');
+        }
+        const sampleRateRatio = inputSampleRate / outputSampleRate;
+        const newLength = Math.round(buffer.length / sampleRateRatio);
+        const result = new Float32Array(newLength);
+        let offsetResult = 0;
+        let offsetBuffer = 0;
+        while (offsetResult < newLength) {
+          const nextOffsetBuffer = Math.round((offsetResult + 1) * sampleRateRatio);
+          let accum = 0, count = 0;
+          for (let i = offsetBuffer; i < nextOffsetBuffer && i < buffer.length; i++) {
+            accum += buffer[i];
+            count++;
+          }
+          result[offsetResult] = count ? (accum / count) : 0;
+          offsetResult++;
+          offsetBuffer = nextOffsetBuffer;
+        }
+        return result;
+      }
+
+      // Helper: convert Float32Array [-1,1] to 16-bit PCM ArrayBuffer (little-endian)
+      function floatTo16BitPCM(float32Array) {
+        const buffer = new ArrayBuffer(float32Array.length * 2);
+        const view = new DataView(buffer);
+        for (let i = 0; i < float32Array.length; i++) {
+          let s = Math.max(-1, Math.min(1, float32Array[i]));
+          view.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+        }
+        return buffer;
+      }
+
+      source.connect(processor);
+      processor.connect(audioContext.destination);
+    } catch (err) {
+      console.error('Realtime start error:', err.message);
+      console.error('Stack:', err.stack);
+      setIsRealtimeStreaming(false);
+      // Cleanup on error
+      if (stream) {
+        try {
+          stream.getTracks().forEach(track => track.stop());
+        } catch (e) {}
+      }
+      alert('Unable to start realtime streaming: ' + (err.message || 'Unknown error'));
+    }
+  };
+
+  const stopRealtimeStream = () => {
+    console.log('[DEBUG] Stop realtime stream called');
+    try {
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        console.log('[DEBUG] Closing WebSocket');
+        wsRef.current.close(1000, 'User requested stop');
+      } else {
+        console.log('[DEBUG] WebSocket not open, readyState:', wsRef.current?.readyState);
+      }
+    } catch (e) {
+      console.warn('Error closing realtime ws', e);
+    }
+    setIsRealtimeStreaming(false);
+  };
+
+  const stopDeepgramRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+      // also stop the tracks in case onstop hasn't executed yet
+      if (mediaStreamRef.current) {
+        try {
+          mediaStreamRef.current.getTracks().forEach((t) => t.stop());
+        } catch (e) {
+          console.warn('Error stopping media tracks', e);
+        }
+        mediaStreamRef.current = null;
+      }
     }
   };
 
@@ -286,34 +518,34 @@ const Transcribe = () => {
                   placeholder="e.g., Introduction to Biology"
                   value={lectureName}
                   onChange={(e) => setLectureName(e.target.value)}
-                  disabled={isRecording}
+                  disabled={isRealtimeStreaming || demoMode || isRecording || isDeepgramRecording}
                 />
               </div>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                {!isRecording ? (
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                {!isRealtimeStreaming ? (
                   <>
-                    <Button onClick={startRecording} className="btn">
+                    <Button onClick={startRealtimeStream} className="btn btn--primary">
                       <Mic style={{ width: '1rem', height: '1rem' }} />
-                      Start Recording
+                      Start Realtime
                     </Button>
-                    <Button onClick={startDemo} className="btn btn--ghost">
+                    <Button onClick={startDemo} className="btn btn--ghost" disabled={isRealtimeStreaming || isRecording || isDeepgramRecording}>
                       <Play style={{ width: '1rem', height: '1rem' }} />
                       Demo
                     </Button>
                   </>
                 ) : (
-                  <Button onClick={stopRecording} className="btn" style={{ background: '#dc2626' }}>
+                  <Button onClick={stopRealtimeStream} className="btn" style={{ background: '#dc2626' }}>
                     <Square style={{ width: '1rem', height: '1rem' }} />
-                    Stop
+                    Stop Realtime
                   </Button>
                 )}
               </div>
             </div>
 
-            {isRecording && (
+            {isRealtimeStreaming && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#dc2626', fontSize: '0.875rem' }}>
                 <div style={{ height: '0.75rem', width: '0.75rem', borderRadius: '50%', background: '#dc2626', animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' }} />
-                <span>{demoMode ? 'Demo in progress...' : 'Recording in progress...'}</span>
+                <span>Realtime streaming in progress...</span>
               </div>
             )}
 
