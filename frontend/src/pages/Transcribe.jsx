@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { Mic, Square, Save, Trash2, Highlighter, Play } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { Mic, Square, Save, Trash2, Highlighter, Play, RefreshCw } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -47,26 +47,25 @@ const DEMO_LECTURE = [
 
 const Transcribe = () => {
   const [isRecording, setIsRecording] = useState(false);
-  const [isDeepgramRecording, setIsDeepgramRecording] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [keywords, setKeywords] = useState([]);
   const [selectedText, setSelectedText] = useState('');
   const [lectureName, setLectureName] = useState('');
   const [browserSupported, setBrowserSupported] = useState(true);
   const [demoMode, setDemoMode] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [lastAnalyzedLength, setLastAnalyzedLength] = useState(0);
+  const [hoveredKeyword, setHoveredKeyword] = useState(null);
   const recognitionRef = useRef(null);
-  const mediaRecorderRef = useRef(null);
-  const audioChunksRef = useRef([]);
-  const mediaStreamRef = useRef(null);
   const demoIntervalRef = useRef(null);
+  const analysisTimerRef = useRef(null);
   const wsRef = useRef(null);
   const audioContextRef = useRef(null);
   const sourceNodeRef = useRef(null);
   const processorRef = useRef(null);
   const [isRealtimeStreaming, setIsRealtimeStreaming] = useState(false);
-  const userRequestedStopRef = useRef(false);
-  const reconnectAttemptsRef = useRef(0);
-  const reconnectTimerRef = useRef(null);
+  const keywordApiBase = (import.meta.env.VITE_KEYWORD_API_BASE || import.meta.env.VITE_API_BASE_URL || 'https://ai-teaching-assistance-project.onrender.com').replace(/\/$/, '');
+  const ANALYSIS_API = `${keywordApiBase}/api/analyze`;
 
   useEffect(() => {
     // Check if browser supports Speech Recognition
@@ -83,19 +82,18 @@ const Transcribe = () => {
     recognition.lang = 'en-US';
 
     recognition.onresult = (event) => {
-      let interimTranscript = '';
       let finalTranscript = '';
 
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const transcriptPiece = event.results[i][0].transcript;
         if (event.results[i].isFinal) {
           finalTranscript += transcriptPiece + ' ';
-        } else {
-          interimTranscript += transcriptPiece;
         }
       }
 
-      setTranscript(prev => prev + finalTranscript);
+      if (finalTranscript) {
+        setTranscript(prev => prev + finalTranscript);
+      }
     };
 
     recognition.onerror = (event) => {
@@ -113,6 +111,25 @@ const Transcribe = () => {
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (!transcript || transcript.length < 50) return;
+    if (transcript.length - lastAnalyzedLength < 100) return;
+
+    if (analysisTimerRef.current) {
+      clearTimeout(analysisTimerRef.current);
+    }
+
+    analysisTimerRef.current = setTimeout(() => {
+      analyzeTranscript(transcript);
+    }, 2000);
+
+    return () => {
+      if (analysisTimerRef.current) {
+        clearTimeout(analysisTimerRef.current);
+      }
+    };
+  }, [transcript, lastAnalyzedLength, analyzeTranscript]);
 
   // Demo mode effect
   useEffect(() => {
@@ -145,7 +162,8 @@ const Transcribe = () => {
             return [...prev, {
               text: cleanWord,
               timestamp: Date.now(),
-              explanation: demoWord.explanation
+              explanation: demoWord.explanation,
+              source: 'demo'
             }];
           }
           return prev;
@@ -163,6 +181,89 @@ const Transcribe = () => {
       setDemoMode(false);
     };
   }, [demoMode]);
+
+  const analyzeTranscript = useCallback(async (text) => {
+    if (!text || text.length < 50) return;
+
+    setIsAnalyzing(true);
+    try {
+      const response = await fetch(ANALYSIS_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transcript: text })
+      });
+
+      if (!response.ok) {
+        throw new Error('Analysis failed');
+      }
+
+      const data = await response.json();
+      if (data.keywords && data.keywords.length > 0) {
+        setKeywords(prevKeywords => {
+          const updated = [...prevKeywords];
+
+          data.keywords.forEach(kw => {
+            const existingIndex = updated.findIndex(
+              current => current.text.toLowerCase() === kw.word.toLowerCase()
+            );
+
+            if (existingIndex >= 0) {
+              const existing = updated[existingIndex];
+              if (!existing.explanation && kw.definition) {
+                updated[existingIndex] = {
+                  ...existing,
+                  explanation: kw.definition,
+                  source: existing.source || 'ai'
+                };
+              }
+            } else {
+              updated.push({
+                text: kw.word,
+                explanation: kw.definition,
+                timestamp: Date.now(),
+                source: 'ai'
+              });
+            }
+          });
+
+          return updated;
+        });
+      }
+
+      setLastAnalyzedLength(text.length);
+    } catch (error) {
+      console.error('Error analyzing transcript:', error);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  }, [ANALYSIS_API]);
+
+  const fetchKeywordDefinition = useCallback(async (word) => {
+    try {
+      const response = await fetch(ANALYSIS_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transcript: word })
+      });
+
+      if (!response.ok) {
+        throw new Error('Definition lookup failed');
+      }
+
+      const data = await response.json();
+      const matched = data.keywords?.find(item => item.word.toLowerCase() === word.toLowerCase());
+      return matched?.definition || '';
+    } catch (error) {
+      console.error('Definition fetch error:', error);
+      return '';
+    }
+  }, [ANALYSIS_API]);
+
+  const triggerAnalysis = useCallback(() => {
+    if (transcript.length > 10) {
+      analyzeTranscript(transcript);
+    }
+  }, [transcript, analyzeTranscript]);
 
   const startRealtimeStream = async () => {
     let stream = null; // declare at function scope to use in handlers
@@ -376,18 +477,10 @@ const Transcribe = () => {
     setIsRealtimeStreaming(false);
   };
 
-  const stopDeepgramRecording = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
-      // also stop the tracks in case onstop hasn't executed yet
-      if (mediaStreamRef.current) {
-        try {
-          mediaStreamRef.current.getTracks().forEach((t) => t.stop());
-        } catch (e) {
-          console.warn('Error stopping media tracks', e);
-        }
-        mediaStreamRef.current = null;
-      }
+  const startRecording = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.start();
+      setIsRecording(true);
     }
   };
 
@@ -407,7 +500,7 @@ const Transcribe = () => {
   };
 
   const startDemo = () => {
-    if (isRecording) return;
+    if (isRecording || isRealtimeStreaming) return;
     setDemoMode(true);
   };
 
@@ -419,30 +512,72 @@ const Transcribe = () => {
     }
   };
 
-  const addKeyword = () => {
-    if (selectedText && !keywords.find(k => k.text === selectedText)) {
-      setKeywords([...keywords, { text: selectedText, timestamp: Date.now() }]);
-      setSelectedText('');
-      window.getSelection()?.removeAllRanges();
+  const addKeyword = async () => {
+    if (!selectedText || keywords.find(k => k.text === selectedText)) {
+      return;
     }
+
+    const cleanSelection = selectedText.trim();
+    let explanation = '';
+    if (cleanSelection.length > 2) {
+      explanation = await fetchKeywordDefinition(cleanSelection);
+    }
+
+    setKeywords(prev => [
+      ...prev,
+      {
+        text: cleanSelection,
+        timestamp: Date.now(),
+        explanation: explanation || undefined,
+        source: 'manual'
+      }
+    ]);
+    setSelectedText('');
+    window.getSelection()?.removeAllRanges();
   };
 
   const removeKeyword = (keyword) => {
-    setKeywords(keywords.filter(k => k.text !== keyword));
+    setKeywords(prev => prev.filter(k => k.text !== keyword));
   };
 
   const highlightKeywords = (text) => {
     if (keywords.length === 0) return text;
-    
-    let highlightedText = text;
+
+    let parts = [{ text, isKeyword: false }];
+
     keywords.forEach(keyword => {
-      const regex = new RegExp(`(${keyword.text})`, 'gi');
-      highlightedText = highlightedText.replace(
-        regex,
-        '<mark class="bg-yellow-200 px-1 rounded" title="' + (keyword.explanation || '') + '">$1</mark>'
-      );
+      const newParts = [];
+      parts.forEach(part => {
+        if (part.isKeyword) {
+          newParts.push(part);
+          return;
+        }
+
+        const regex = new RegExp(`\\b(${keyword.text})\\b`, 'gi');
+        const matches = [...part.text.matchAll(regex)];
+
+        if (matches.length === 0) {
+          newParts.push(part);
+          return;
+        }
+
+        let lastIndex = 0;
+        matches.forEach(match => {
+          if (match.index > lastIndex) {
+            newParts.push({ text: part.text.slice(lastIndex, match.index), isKeyword: false });
+          }
+          newParts.push({ text: match[0], isKeyword: true, keyword });
+          lastIndex = match.index + match[0].length;
+        });
+
+        if (lastIndex < part.text.length) {
+          newParts.push({ text: part.text.slice(lastIndex), isKeyword: false });
+        }
+      });
+      parts = newParts;
     });
-    return highlightedText;
+
+    return parts;
   };
 
   const saveTranscript = () => {
@@ -465,7 +600,7 @@ const Transcribe = () => {
     });
     localStorage.setItem('keywords', JSON.stringify(savedKeywords));
     
-    alert('Transcript saved successfully!');
+    alert('Transcript saved successfully');
   };
 
   const clearTranscript = () => {
@@ -473,6 +608,13 @@ const Transcribe = () => {
       setTranscript('');
       setKeywords([]);
       setLectureName('');
+      setLastAnalyzedLength(0);
+      setHoveredKeyword(null);
+      setIsAnalyzing(false);
+      if (analysisTimerRef.current) {
+        clearTimeout(analysisTimerRef.current);
+        analysisTimerRef.current = null;
+      }
     }
   };
 
@@ -488,12 +630,14 @@ const Transcribe = () => {
     );
   }
 
+  const highlightedParts = highlightKeywords(transcript);
+
   return (
     <div style={{ width: '100%', maxWidth: '1400px', margin: '0 auto', padding: '2rem clamp(1rem, 3vw, 2rem)' }}>
       {/* Header */}
       <div style={{ marginBottom: '2rem' }}>
-        <h1 className="card__title">Live Transcription</h1>
-        <p className="card__subtitle">Record your lecture and highlight important keywords</p>
+        <h1 className="card__title">AI-Assisted Live Transcription</h1>
+        <p className="card__subtitle">Capture lectures, highlight keywords, and view instant definitions</p>
       </div>
 
       {/* Two Column Layout */}
@@ -515,34 +659,51 @@ const Transcribe = () => {
                   placeholder="e.g., Introduction to Biology"
                   value={lectureName}
                   onChange={(e) => setLectureName(e.target.value)}
-                  disabled={isRealtimeStreaming || demoMode || isRecording || isDeepgramRecording}
+                  disabled={isRealtimeStreaming || demoMode || isRecording}
                 />
               </div>
-              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                {!isRealtimeStreaming ? (
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                {!isRecording && !isRealtimeStreaming ? (
                   <>
-                    <Button onClick={startRealtimeStream} className="btn btn--primary">
+                    <Button onClick={startRecording} className="btn btn--primary">
                       <Mic style={{ width: '1rem', height: '1rem' }} />
-                      Start Realtime
+                      Start Recording
                     </Button>
-                    <Button onClick={startDemo} className="btn btn--ghost" disabled={isRealtimeStreaming || isRecording || isDeepgramRecording}>
+                    <Button onClick={startRealtimeStream} className="btn">
+                      <Mic style={{ width: '1rem', height: '1rem' }} />
+                      Realtime
+                    </Button>
+                    <Button onClick={startDemo} className="btn btn--ghost">
                       <Play style={{ width: '1rem', height: '1rem' }} />
                       Demo
                     </Button>
                   </>
                 ) : (
-                  <Button onClick={stopRealtimeStream} className="btn" style={{ background: '#dc2626' }}>
+                  <Button
+                    onClick={isRealtimeStreaming ? stopRealtimeStream : stopRecording}
+                    className="btn"
+                    style={{ background: '#dc2626' }}
+                  >
                     <Square style={{ width: '1rem', height: '1rem' }} />
-                    Stop Realtime
+                    Stop
                   </Button>
                 )}
+                <Button
+                  onClick={triggerAnalysis}
+                  disabled={isAnalyzing || transcript.length < 50}
+                  className="btn"
+                  title="Manually trigger AI keyword analysis"
+                >
+                  <RefreshCw style={{ width: '1rem', height: '1rem' }} />
+                  {isAnalyzing ? 'Analyzing...' : 'Analyze'}
+                </Button>
               </div>
             </div>
 
-            {isRealtimeStreaming && (
+            {(isRecording || isRealtimeStreaming) && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#dc2626', fontSize: '0.875rem' }}>
                 <div style={{ height: '0.75rem', width: '0.75rem', borderRadius: '50%', background: '#dc2626', animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' }} />
-                <span>Realtime streaming in progress...</span>
+                <span>Recording in progress{isAnalyzing ? ' (AI analyzing...)' : ''}</span>
               </div>
             )}
 
@@ -554,13 +715,84 @@ const Transcribe = () => {
                 borderRadius: '0.75rem', 
                 border: '2px dashed rgba(209, 213, 219, 0.8)',
                 whiteSpace: 'pre-wrap',
-                lineHeight: '1.8'
+                lineHeight: '1.8',
+                fontSize: '1rem',
+                position: 'relative'
               }}
               onMouseUp={handleTextSelection}
-              dangerouslySetInnerHTML={{ 
-                __html: highlightKeywords(transcript) || '<span style="color: #9ca3af">Your transcription will appear here...</span>' 
-              }}
-            />
+            >
+              {transcript ? (
+                <span>
+                  {Array.isArray(highlightedParts) ? (
+                    highlightedParts.map((part, index) =>
+                      part.isKeyword ? (
+                        <mark
+                          key={`${part.text}-${index}`}
+                          style={{
+                            background: part.keyword.source === 'ai' ? '#dbeafe' : '#fef3c7',
+                            padding: '2px 4px',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            position: 'relative',
+                            border: part.keyword.source === 'ai' ? '1px solid #93c5fd' : '1px solid #fde047'
+                          }}
+                          onMouseEnter={() => setHoveredKeyword(part.keyword)}
+                          onMouseLeave={() => setHoveredKeyword(null)}
+                        >
+                          {part.text}
+                          {hoveredKeyword === part.keyword && part.keyword.explanation && (
+                            <span
+                              style={{
+                                position: 'absolute',
+                                bottom: '100%',
+                                left: '50%',
+                                transform: 'translateX(-50%)',
+                                marginBottom: '8px',
+                                padding: '8px 12px',
+                                background: '#1f2937',
+                                color: 'white',
+                                borderRadius: '8px',
+                                fontSize: '0.875rem',
+                                width: '240px',
+                                zIndex: 1000,
+                                boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+                                pointerEvents: 'none'
+                              }}
+                            >
+                              {part.keyword.explanation}
+                              <span
+                                style={{
+                                  position: 'absolute',
+                                  top: '100%',
+                                  left: '50%',
+                                  transform: 'translateX(-50%)',
+                                  width: 0,
+                                  height: 0,
+                                  borderLeft: '6px solid transparent',
+                                  borderRight: '6px solid transparent',
+                                  borderTop: '6px solid #1f2937'
+                                }}
+                              />
+                            </span>
+                          )}
+                        </mark>
+                      ) : (
+                        <span key={index}>{part.text}</span>
+                      )
+                    )
+                  ) : (
+                    highlightedParts
+                  )}
+                </span>
+              ) : (
+                <span style={{ color: '#9ca3af' }}>
+                  Your transcription will appear here.
+                  <br />
+                  <br />
+                  <small>The assistant will extract keywords and definitions automatically as you speak.</small>
+                </span>
+              )}
+            </div>
 
             {selectedText && (
               <div style={{ 
@@ -597,33 +829,52 @@ const Transcribe = () => {
 
         {/* Right Column - Keywords Sidebar */}
         <div className="card" style={{ background: '#fffbeb', position: 'sticky', top: '2rem' }}>
-          <h3 style={{ margin: '0 0 1rem 0', fontSize: '1.125rem', fontWeight: '600' }}>
-            Keywords ({keywords.length})
-          </h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <h3 style={{ margin: 0, fontSize: '1.125rem', fontWeight: '600' }}>
+              Keywords ({keywords.length})
+            </h3>
+            {isAnalyzing && (
+              <span style={{ fontSize: '0.75rem', color: '#78716c' }}>AI analyzing...</span>
+            )}
+          </div>
           
           {keywords.length === 0 ? (
-            <p style={{ fontSize: '0.875rem', color: '#78716c', margin: 0 }}>
-              Select text from the transcript and click "Add Keyword" to highlight important terms.
-            </p>
+            <div style={{ fontSize: '0.875rem', color: '#78716c' }}>
+              AI extracted keywords and manual selections will appear here with definitions.
+            </div>
           ) : (
             <div style={{ display: 'grid', gap: '0.5rem', maxHeight: '600px', overflowY: 'auto' }}>
               {keywords.map((keyword, index) => (
                 <div 
-                  key={index}
+                  key={`${keyword.text}-${index}`}
                   style={{ 
                     display: 'flex', 
                     alignItems: 'flex-start', 
                     justifyContent: 'space-between',
                     padding: '0.75rem', 
-                    background: '#fef3c7', 
-                    border: '1px solid #fde047',
+                    background: keyword.source === 'ai' ? '#dbeafe' : keyword.source === 'manual' ? '#fef3c7' : '#ede9fe',
+                    border: keyword.source === 'ai' ? '1px solid #93c5fd' : '1px solid #fde047',
                     borderRadius: '0.75rem',
                     gap: '0.75rem'
                   }}
                 >
                   <div style={{ flex: '1' }}>
-                    <div style={{ fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.25rem' }}>
+                    <div style={{ fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       {keyword.text}
+                      {keyword.source && (
+                        <span
+                          style={{
+                            fontSize: '0.65rem',
+                            background: keyword.source === 'ai' ? '#3b82f6' : '#f59e0b',
+                            color: 'white',
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            textTransform: 'uppercase'
+                          }}
+                        >
+                          {keyword.source}
+                        </span>
+                      )}
                     </div>
                     {keyword.explanation && (
                       <div style={{ fontSize: '0.75rem', color: '#78716c', lineHeight: '1.4' }}>
@@ -641,6 +892,7 @@ const Transcribe = () => {
                       padding: '0.25rem',
                       flexShrink: 0
                     }}
+                    title="Remove keyword"
                   >
                     <Trash2 style={{ width: '1rem', height: '1rem' }} />
                   </button>
