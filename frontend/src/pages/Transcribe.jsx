@@ -64,8 +64,9 @@ const Transcribe = () => {
   const sourceNodeRef = useRef(null);
   const processorRef = useRef(null);
   const [isRealtimeStreaming, setIsRealtimeStreaming] = useState(false);
-  const keywordApiBase = (import.meta.env.VITE_KEYWORD_API_BASE || import.meta.env.VITE_API_BASE_URL || 'https://ai-teaching-assistance-project.onrender.com').replace(/\/$/, '');
-  const ANALYSIS_API = `${keywordApiBase}/api/analyze`;
+  
+  // Keyword analysis API - proxied through Node.js backend to Python backend
+  const ANALYSIS_API = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001').replace(/\/$/, '') + '/api/analyze';
 
   useEffect(() => {
     // Check if browser supports Speech Recognition
@@ -164,22 +165,31 @@ const Transcribe = () => {
   }, [demoMode]);
 
   const analyzeTranscript = useCallback(async (text) => {
-    if (!text || text.length < 50) return;
+    if (!text || text.length < 20) return;
 
     setIsAnalyzing(true);
+    console.log('[KEYWORD] Starting analysis for text length:', text.length);
+    console.log('[KEYWORD] API endpoint:', ANALYSIS_API);
+    
     try {
+      console.log('[KEYWORD] Sending request to:', ANALYSIS_API);
       const response = await fetch(ANALYSIS_API, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ transcript: text })
       });
 
+      console.log('[KEYWORD] Response status:', response.status, response.statusText);
+
       if (!response.ok) {
-        throw new Error('Analysis failed');
+        throw new Error(`Analysis failed with status ${response.status}`);
       }
 
       const data = await response.json();
+      console.log('[KEYWORD] Analysis response:', data);
+      
       if (data.keywords && data.keywords.length > 0) {
+        console.log(`[KEYWORD] Extracted ${data.keywords.length} keywords:`, data.keywords.map(k => k.word));
         setKeywords(prevKeywords => {
           const updated = [...prevKeywords];
 
@@ -191,6 +201,7 @@ const Transcribe = () => {
             if (existingIndex >= 0) {
               const existing = updated[existingIndex];
               if (!existing.explanation && kw.definition) {
+                console.log('[KEYWORD] Updating definition for:', kw.word);
                 updated[existingIndex] = {
                   ...existing,
                   explanation: kw.definition,
@@ -198,6 +209,7 @@ const Transcribe = () => {
                 };
               }
             } else {
+              console.log('[KEYWORD] Adding new keyword:', kw.word);
               updated.push({
                 text: kw.word,
                 explanation: kw.definition,
@@ -207,21 +219,25 @@ const Transcribe = () => {
             }
           });
 
+          console.log('[KEYWORD] Total keywords after update:', updated.length);
           return updated;
         });
+      } else {
+        console.log('[KEYWORD] No keywords found in response');
       }
 
       setLastAnalyzedLength(text.length);
     } catch (error) {
-      console.error('Error analyzing transcript:', error);
+      console.error('[KEYWORD] Error analyzing transcript:', error);
+      console.error('[KEYWORD] Error details:', error.message);
     } finally {
       setIsAnalyzing(false);
     }
   }, [ANALYSIS_API]);
 
   useEffect(() => {
-    if (!transcript || transcript.length < 50) return;
-    if (transcript.length - lastAnalyzedLength < 100) return;
+    if (!transcript || transcript.length < 20) return;
+    if (transcript.length - lastAnalyzedLength < 30) return;
 
     if (analysisTimerRef.current) {
       clearTimeout(analysisTimerRef.current);
@@ -229,7 +245,7 @@ const Transcribe = () => {
 
     analysisTimerRef.current = setTimeout(() => {
       analyzeTranscript(transcript);
-    }, 2000);
+    }, 500);
 
     return () => {
       if (analysisTimerRef.current) {
@@ -668,10 +684,6 @@ const Transcribe = () => {
                     <Button onClick={startRecording} className="btn btn--primary">
                       <Mic style={{ width: '1rem', height: '1rem' }} />
                       Start Recording
-                    </Button>
-                    <Button onClick={startRealtimeStream} className="btn">
-                      <Mic style={{ width: '1rem', height: '1rem' }} />
-                      Realtime
                     </Button>
                     <Button onClick={startDemo} className="btn btn--ghost">
                       <Play style={{ width: '1rem', height: '1rem' }} />

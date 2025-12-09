@@ -128,43 +128,53 @@ def analyze_transcript():
     """
     try:
         data = request.get_json()
+        logger.info(f"[ANALYZE] Received analyze request")
         
         if not data or 'transcript' not in data:
+            logger.warning('[ANALYZE] No transcript provided in request')
             return jsonify({'error': 'No transcript provided'}), 400
         
         transcript = data['transcript']
+        logger.info(f"[ANALYZE] Transcript length: {len(transcript)}")
         
         if not transcript or len(transcript.strip()) < 10:
+            logger.info('[ANALYZE] Transcript too short, returning empty keywords')
             return jsonify({
                 'transcript': transcript,
                 'keywords': []
             })
         
         # Extract keywords using both methods
+        logger.info('[ANALYZE] Extracting keywords with spaCy...')
         spacy_kw = extract_keywords_spacy(transcript, max_keywords=10)
+        logger.info(f"[ANALYZE] spaCy found {len(spacy_kw)} keywords: {spacy_kw}")
+        
+        logger.info('[ANALYZE] Extracting keywords with KeyBERT...')
         keybert_kw = extract_keywords_keybert(transcript, max_keywords=10)
+        logger.info(f"[ANALYZE] KeyBERT found {len(keybert_kw)} keywords: {keybert_kw}")
         
         # Merge keywords
         merged_keywords = merge_keywords(spacy_kw, keybert_kw)
-        
-        logger.info(f"Extracted {len(merged_keywords)} keywords from transcript of length {len(transcript)}")
+        logger.info(f"[ANALYZE] Merged {len(merged_keywords)} keywords: {merged_keywords}")
         
         # Get definitions for keywords
         keywords_with_definitions = []
         for keyword in merged_keywords:
+            logger.info(f"[ANALYZE] Getting definition for: {keyword}")
             definition = get_definition(keyword)
             keywords_with_definitions.append({
                 'word': keyword,
                 'definition': definition
             })
         
+        logger.info(f"[ANALYZE] Returning {len(keywords_with_definitions)} keywords with definitions")
         return jsonify({
             'transcript': transcript,
             'keywords': keywords_with_definitions
         })
     
     except Exception as e:
-        logger.error(f"Error analyzing transcript: {e}")
+        logger.error(f"[ANALYZE] Error analyzing transcript: {e}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/health', methods=['GET'])

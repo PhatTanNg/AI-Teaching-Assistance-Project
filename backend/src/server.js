@@ -41,6 +41,44 @@ app.use("/api/transcribe", transcribeRoute);
 //app.use(protectedRoute);
 app.use("/api/users",protectedRoute , userRoute);
 
+// Proxy endpoint for keyword analysis (forwards to Python backend)
+app.post('/api/analyze', async (req, res) => {
+  try {
+    const { transcript } = req.body;
+    console.log('[ANALYZE] Received analyze request, transcript length:', transcript?.length);
+    
+    if (!transcript) {
+      console.warn('[ANALYZE] No transcript provided');
+      return res.status(400).json({ error: 'No transcript provided' });
+    }
+
+    // Forward request to Python backend
+    const pythonBackendUrl = process.env.PYTHON_BACKEND_URL || 'http://localhost:5002';
+    console.log('[ANALYZE] Forwarding to Python backend:', pythonBackendUrl);
+    
+    const response = await fetch(`${pythonBackendUrl}/api/analyze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ transcript })
+    });
+
+    console.log('[ANALYZE] Python backend response status:', response.status);
+
+    if (!response.ok) {
+      console.error(`[ANALYZE] Python backend error: ${response.status}`);
+      const errorText = await response.text();
+      console.error('[ANALYZE] Error response:', errorText);
+      return res.status(response.status).json({ error: 'Keyword analysis failed', details: errorText });
+    }
+
+    const data = await response.json();
+    console.log('[ANALYZE] Successfully got keywords:', data.keywords?.length, 'keywords');
+    res.json(data);
+  } catch (error) {
+    console.error('[ANALYZE] Keyword analysis proxy error:', error);
+    res.status(500).json({ error: 'Failed to analyze transcript', details: error.message });
+  }
+});
 
 connectDB().then(() => {
   const server = http.createServer(app);
