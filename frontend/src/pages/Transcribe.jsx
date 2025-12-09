@@ -112,25 +112,6 @@ const Transcribe = () => {
     };
   }, []);
 
-  useEffect(() => {
-    if (!transcript || transcript.length < 50) return;
-    if (transcript.length - lastAnalyzedLength < 100) return;
-
-    if (analysisTimerRef.current) {
-      clearTimeout(analysisTimerRef.current);
-    }
-
-    analysisTimerRef.current = setTimeout(() => {
-      analyzeTranscript(transcript);
-    }, 2000);
-
-    return () => {
-      if (analysisTimerRef.current) {
-        clearTimeout(analysisTimerRef.current);
-      }
-    };
-  }, [transcript, lastAnalyzedLength, analyzeTranscript]);
-
   // Demo mode effect
   useEffect(() => {
     if (!demoMode) return;
@@ -237,6 +218,25 @@ const Transcribe = () => {
       setIsAnalyzing(false);
     }
   }, [ANALYSIS_API]);
+
+  useEffect(() => {
+    if (!transcript || transcript.length < 50) return;
+    if (transcript.length - lastAnalyzedLength < 100) return;
+
+    if (analysisTimerRef.current) {
+      clearTimeout(analysisTimerRef.current);
+    }
+
+    analysisTimerRef.current = setTimeout(() => {
+      analyzeTranscript(transcript);
+    }, 2000);
+
+    return () => {
+      if (analysisTimerRef.current) {
+        clearTimeout(analysisTimerRef.current);
+      }
+    };
+  }, [transcript, lastAnalyzedLength, analyzeTranscript]);
 
   const fetchKeywordDefinition = useCallback(async (word) => {
     try {
