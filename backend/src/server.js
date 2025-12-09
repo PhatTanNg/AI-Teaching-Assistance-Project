@@ -52,30 +52,57 @@ app.post('/api/analyze', async (req, res) => {
       return res.status(400).json({ error: 'No transcript provided' });
     }
 
-    // Forward request to Python backend
-    const pythonBackendUrl = process.env.PYTHON_BACKEND_URL || 'http://localhost:5002';
+    // Determine Python backend URL based on environment
+    // In production (Render), use the dedicated Python service URL
+    // In development, use localhost
+    let pythonBackendUrl = process.env.PYTHON_BACKEND_URL;
+    
+    if (!pythonBackendUrl) {
+      const isProduction = process.env.NODE_ENV === 'production' || process.env.RENDER === 'true';
+      if (isProduction) {
+        // Use the Render-hosted Python backend service name or external URL
+        pythonBackendUrl = 'https://ai-teaching-keyword-service.onrender.com'; // Update with actual Python service URL if different
+      } else {
+        pythonBackendUrl = 'http://localhost:5002';
+      }
+    }
+    
     console.log('[ANALYZE] Forwarding to Python backend:', pythonBackendUrl);
     
-    const response = await fetch(`${pythonBackendUrl}/api/analyze`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ transcript })
-    });
+    try {
+      const response = await fetch(`${pythonBackendUrl}/api/analyze`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transcript }),
+        timeout: 10000
+      });
 
-    console.log('[ANALYZE] Python backend response status:', response.status);
+      console.log('[ANALYZE] Python backend response status:', response.status);
 
-    if (!response.ok) {
-      console.error(`[ANALYZE] Python backend error: ${response.status}`);
-      const errorText = await response.text();
-      console.error('[ANALYZE] Error response:', errorText);
-      return res.status(response.status).json({ error: 'Keyword analysis failed', details: errorText });
+      if (!response.ok) {
+        console.error(`[ANALYZE] Python backend error: ${response.status}`);
+        const errorText = await response.text();
+        console.error('[ANALYZE] Error response:', errorText);
+        return res.status(response.status).json({ error: 'Keyword analysis failed', details: errorText });
+      }
+
+      const data = await response.json();
+      console.log('[ANALYZE] Successfully got keywords:', data.keywords?.length, 'keywords');
+      res.json(data);
+    } catch (fetchError) {
+      console.error('[ANALYZE] Python backend connection error:', fetchError.message);
+      console.error('[ANALYZE] Attempted URL:', pythonBackendUrl);
+      console.warn('[ANALYZE] Python backend is unavailable. Returning empty keywords.');
+      
+      // Return empty keywords array instead of error
+      res.status(200).json({ 
+        transcript: transcript,
+        keywords: [],
+        note: `Keyword analysis service unavailable at ${pythonBackendUrl}. Please ensure Python backend is running.`
+      });
     }
-
-    const data = await response.json();
-    console.log('[ANALYZE] Successfully got keywords:', data.keywords?.length, 'keywords');
-    res.json(data);
   } catch (error) {
-    console.error('[ANALYZE] Keyword analysis proxy error:', error);
+    console.error('[ANALYZE] Keyword analysis error:', error);
     res.status(500).json({ error: 'Failed to analyze transcript', details: error.message });
   }
 });
