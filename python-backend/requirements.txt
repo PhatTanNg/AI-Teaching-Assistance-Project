@@ -1,6 +1,4 @@
 Flask==3.0.0
 flask-cors==4.0.0
-spacy==3.7.2
-keybert==0.8.4
 wikipedia==1.4.0
 gunicorn==21.2.0

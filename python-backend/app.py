@@ -1,10 +1,29 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import spacy
 import wikipedia
 import re
 from typing import List, Dict
 import logging
+import nltk
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize, sent_tokenize
+from nltk.tag import pos_tag
+
+# Download required NLTK data
+try:
+    nltk.data.find('tokenizers/punkt')
+except LookupError:
+    nltk.download('punkt')
+
+try:
+    nltk.data.find('corpora/stopwords')
+except LookupError:
+    nltk.download('stopwords')
+
+try:
+    nltk.data.find('taggers/averaged_perceptron_tagger')
+except LookupError:
+    nltk.download('averaged_perceptron_tagger')
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -13,47 +32,41 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 CORS(app)
 
-# Initialize NLP models
-try:
-    nlp = spacy.load("en_core_web_sm")
-    logger.info("spaCy model loaded successfully")
-except OSError:
-    logger.error("spaCy model not found. Please run: python -m spacy download en_core_web_sm")
-    nlp = None
-
 def extract_keywords_spacy(text: str, max_keywords: int = 10) -> List[str]:
-    """Extract keywords using spaCy NER and noun chunks"""
-    if not nlp or not text:
+    """Extract keywords using NLTK POS tagging (nouns and proper nouns)"""
+    if not text:
         return []
     
-    doc = nlp(text)
-    keywords = set()
-    
-    # Extract named entities
-    for ent in doc.ents:
-        if ent.label_ in ['PERSON', 'ORG', 'GPE', 'PRODUCT', 'EVENT', 'LAW', 'LANGUAGE']:
-            keywords.add(ent.text.lower())
-    
-    # Extract noun chunks (important concepts)
-    for chunk in doc.noun_chunks:
-        # Filter for meaningful chunks (2-3 words max, containing important POS tags)
-        words = chunk.text.split()
-        if 1 <= len(words) <= 3:
-            # Check if chunk contains nouns or proper nouns
-            has_important_word = any(token.pos_ in ['NOUN', 'PROPN'] for token in chunk)
-            if has_important_word:
-                keywords.add(chunk.text.lower())
-    
-    # Extract important single nouns and proper nouns
-    for token in doc:
-        if token.pos_ in ['NOUN', 'PROPN'] and len(token.text) > 3:
-            keywords.add(token.text.lower())
-    
-    return list(keywords)[:max_keywords]
+    try:
+        # Tokenize into sentences
+        sentences = sent_tokenize(text)
+        keywords = set()
+        stop_words = set(stopwords.words('english'))
+        
+        for sentence in sentences:
+            # Tokenize and POS tag
+            tokens = word_tokenize(sentence.lower())
+            pos_tags = pos_tag(tokens)
+            
+            # Extract nouns and proper nouns
+            for word, pos in pos_tags:
+                # NN = Noun, NNS = Plural Noun, NNP = Proper Noun, NNPS = Plural Proper Noun
+                if pos in ['NN', 'NNS', 'NNP', 'NNPS'] and word not in stop_words and len(word) > 2:
+                    keywords.add(word)
+        
+        # Sort by frequency and return top keywords
+        return sorted(list(keywords))[:max_keywords]
+    except Exception as e:
+        logger.error(f"NLTK extraction failed: {e}")
+        return []
 
 def extract_keywords_keybert(text: str, max_keywords: int = 10) -> List[str]:
-    """Extract keywords using spaCy only (KeyBERT removed for Render compatibility)"""
-    return []  # Return empty, spaCy is enough
+    """Removed - not used"""
+    return []
+
+def merge_keywords(spacy_keywords: List[str], keybert_keywords: List[str]) -> List[str]:
+    """Removed - not used"""
+    return spacy_keywords[:15]
 
 def get_definition(keyword: str) -> str:
     """Fetch student-friendly definition from Wikipedia"""
@@ -122,17 +135,13 @@ def analyze_transcript():
                 'keywords': []
             })
         
-        # Extract keywords using both methods
-        logger.info('[ANALYZE] Extracting keywords with spaCy...')
-        spacy_kw = extract_keywords_spacy(transcript, max_keywords=10)
-        logger.info(f"[ANALYZE] spaCy found {len(spacy_kw)} keywords: {spacy_kw}")
+        # Extract keywords using NLTK
+        logger.info('[ANALYZE] Extracting keywords with NLTK...')
+        nltk_kw = extract_keywords_spacy(transcript, max_keywords=10)
+        logger.info(f"[ANALYZE] NLTK found {len(nltk_kw)} keywords: {nltk_kw}")
         
-        logger.info('[ANALYZE] Extracting keywords with KeyBERT...')
-        keybert_kw = extract_keywords_keybert(transcript, max_keywords=10)
-        logger.info(f"[ANALYZE] KeyBERT found {len(keybert_kw)} keywords: {keybert_kw}")
-        
-        # Merge keywords
-        merged_keywords = merge_keywords(spacy_kw, keybert_kw)
+        # Use only NLTK keywords (merged approach)
+        merged_keywords = nltk_kw
         logger.info(f"[ANALYZE] Merged {len(merged_keywords)} keywords: {merged_keywords}")
         
         # Get definitions for keywords
@@ -160,7 +169,7 @@ def health_check():
     """Health check endpoint"""
     return jsonify({
         'status': 'healthy',
-        'spacy_loaded': nlp is not None
+        'nltk_ready': True
     })
 
 @app.route('/', methods=['GET'])
