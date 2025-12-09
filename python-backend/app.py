@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import wikipedia
 import re
+import sys
 from typing import List, Dict
 import logging
 import nltk
@@ -9,25 +10,36 @@ from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize, sent_tokenize
 from nltk.tag import pos_tag
 
-# Download required NLTK data
-try:
-    nltk.data.find('tokenizers/punkt')
-except LookupError:
-    nltk.download('punkt')
-
-try:
-    nltk.data.find('corpora/stopwords')
-except LookupError:
-    nltk.download('stopwords')
-
-try:
-    nltk.data.find('taggers/averaged_perceptron_tagger')
-except LookupError:
-    nltk.download('averaged_perceptron_tagger')
+# Check Python version
+if sys.version_info < (3, 8):
+    raise RuntimeError("Python 3.8+ required")
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+logger.info(f"Python version: {sys.version}")
+
+# Download required NLTK data
+logger.info("Downloading NLTK data...")
+try:
+    nltk.data.find('tokenizers/punkt')
+except LookupError:
+    logger.info("Downloading punkt...")
+    nltk.download('punkt', quiet=True)
+
+try:
+    nltk.data.find('corpora/stopwords')
+except LookupError:
+    logger.info("Downloading stopwords...")
+    nltk.download('stopwords', quiet=True)
+
+try:
+    nltk.data.find('taggers/averaged_perceptron_tagger')
+except LookupError:
+    logger.info("Downloading averaged_perceptron_tagger...")
+    nltk.download('averaged_perceptron_tagger', quiet=True)
+
+logger.info("NLTK data ready")
 
 app = Flask(__name__)
 CORS(app)
