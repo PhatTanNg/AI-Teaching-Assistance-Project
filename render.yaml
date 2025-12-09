@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: ai-teaching-node-backend
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm run dev
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PYTHON_BACKEND_URL
+        fromService:
+          name: ai-teaching-python-backend
+          type: web
+          property: url
+
+  - type: web
+    name: ai-teaching-python-backend
+    runtime: python
+    rootDir: python-backend
+    buildCommand: pip install -r requirements.txt && python -m spacy download en_core_web_sm
+    startCommand: gunicorn --bind 0.0.0.0:10000 app:app
+    envVars:
+      - key: FLASK_ENV
+        value: production
