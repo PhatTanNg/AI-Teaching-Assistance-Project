@@ -1,7 +1,6 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import spacy
-from keybert import KeyBERT
 import wikipedia
 import re
 from typing import List, Dict
@@ -21,13 +20,6 @@ try:
 except OSError:
     logger.error("spaCy model not found. Please run: python -m spacy download en_core_web_sm")
     nlp = None
-
-try:
-    kw_model = KeyBERT()
-    logger.info("KeyBERT model loaded successfully")
-except Exception as e:
-    logger.error(f"KeyBERT initialization failed: {e}")
-    kw_model = None
 
 def extract_keywords_spacy(text: str, max_keywords: int = 10) -> List[str]:
     """Extract keywords using spaCy NER and noun chunks"""
@@ -60,22 +52,8 @@ def extract_keywords_spacy(text: str, max_keywords: int = 10) -> List[str]:
     return list(keywords)[:max_keywords]
 
 def extract_keywords_keybert(text: str, max_keywords: int = 10) -> List[str]:
-    """Extract keywords using KeyBERT"""
-    if not kw_model or not text:
-        return []
-    
-    try:
-        keywords = kw_model.extract_keywords(
-            text, 
-            keyphrase_ngram_range=(1, 3),
-            stop_words='english',
-            top_n=max_keywords,
-            diversity=0.7
-        )
-        return [kw[0] for kw in keywords]
-    except Exception as e:
-        logger.error(f"KeyBERT extraction failed: {e}")
-        return []
+    """Extract keywords using spaCy only (KeyBERT removed for Render compatibility)"""
+    return []  # Return empty, spaCy is enough
 
 def get_definition(keyword: str) -> str:
     """Fetch student-friendly definition from Wikipedia"""
@@ -182,8 +160,7 @@ def health_check():
     """Health check endpoint"""
     return jsonify({
         'status': 'healthy',
-        'spacy_loaded': nlp is not None,
-        'keybert_loaded': kw_model is not None
+        'spacy_loaded': nlp is not None
     })
 
 @app.route('/', methods=['GET'])
