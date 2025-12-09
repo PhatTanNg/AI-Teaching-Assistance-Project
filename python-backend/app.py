@@ -60,14 +60,6 @@ def extract_keywords_spacy(text: str, max_keywords: int = 10) -> List[str]:
         logger.error(f"NLTK extraction failed: {e}")
         return []
 
-def extract_keywords_keybert(text: str, max_keywords: int = 10) -> List[str]:
-    """Removed - not used"""
-    return []
-
-def merge_keywords(spacy_keywords: List[str], keybert_keywords: List[str]) -> List[str]:
-    """Removed - not used"""
-    return spacy_keywords[:15]
-
 def get_definition(keyword: str) -> str:
     """Fetch student-friendly definition from Wikipedia"""
     try:
@@ -99,16 +91,6 @@ def get_definition(keyword: str) -> str:
     except Exception as e:
         logger.error(f"Definition fetch error for '{keyword}': {e}")
         return f"An important concept: {keyword}"
-
-def merge_keywords(spacy_keywords: List[str], keybert_keywords: List[str]) -> List[str]:
-    """Merge and deduplicate keywords from both methods"""
-    # Combine and deduplicate
-    all_keywords = list(set(spacy_keywords + keybert_keywords))
-    
-    # Sort by length (prefer single words over phrases) and alphabetically
-    all_keywords.sort(key=lambda x: (len(x.split()), x))
-    
-    return all_keywords[:15]  # Return top 15 keywords
 
 @app.route('/api/analyze', methods=['POST'])
 def analyze_transcript():
