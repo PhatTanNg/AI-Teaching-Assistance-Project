@@ -1,152 +1,70 @@
 # AI Teaching Assistant
 
-Nền tảng hỗ trợ dạy học AI: chuyển giọng nói thành văn bản, tự động trích xuất từ khóa, giải thích khái niệm cho học sinh.
+AI-powered lecture companion that records speech, generates transcripts, extracts key vocabulary, and surfaces concise definitions for students.
 
-## Cài đặt nhanh
+## Live Demo
+- [Hosted Web App](https://ai-teaching-assistance-project.vercel.app/)
 
-### Backend Node.js
+## System Overview
+- **Frontend (React + Vite):** Real-time transcript view, keyword sidebar, manual keyword selection, persistent storage via `localStorage`.
+- **Node.js Backend (Express):** REST APIs, authentication, Google Speech-to-Text integration, and a proxy endpoint that forwards keyword analysis requests to Python.
+- **Python Keyword Service (Flask + NLTK):** POS-tag-based keyword extraction and Wikipedia-powered definition lookup.
+
+## Prerequisites
+- Node.js 18+
+- Python 3.8+
+- npm or pnpm
+- (Optional) Google Cloud project with Speech-to-Text enabled and `GOOGLE_APPLICATION_CREDENTIALS` pointing to a service-account JSON.
+
+## Quick Start
+
+### Node.js Backend
 ```bash
 cd backend
 npm install
-# Thêm file .env (xem ví dụ trong repo)
+# copy .env.example to .env and configure JWT secrets, MongoDB URI, GOOGLE_APPLICATION_CREDENTIALS, etc.
 npm run dev
 ```
 
-### Backend Python (AI Keyword)
+### Python Keyword Service
 ```bash
 cd python-backend
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+# macOS/Linux: source .venv/bin/activate
 pip install -r requirements.txt
-python -m spacy download en_core_web_sm
 python app.py
 ```
 
-### Frontend React
+### React Frontend
 ```bash
 cd frontend
 npm install
-# Thêm file .env nếu cần sửa API URL
+# optional: create .env and set VITE_API_BASE_URL if the API is not on http://localhost:5001
 npm run dev
 ```
 
-## Chạy tất cả cùng lúc (Windows)
+### One-Command Startup (Windows)
 ```powershell
 ./start-all.ps1
 ```
 
-## Link deploy (nếu có)
-- Backend: [link Render/Heroku bạn đã cấu hình]
-- Frontend: [link Vercel/Netlify bạn đã deploy]
+Access the UI at `http://localhost:5173`.
 
-## Sử dụng
-1. Truy cập trang `/transcribe` để trải nghiệm AI tự động trích xuất từ khóa và giải thích.
-2. Có thể chọn từ khóa thủ công hoặc dùng AI, cả hai đều lưu ở sidebar.
-3. Hover vào từ khóa để xem giải thích.
+## Using the App
+1. Open the **Transcribe** page and click **Start Recording** (or demo mode) to capture speech.
+2. Watch transcripts update in real time while AI-generated keywords populate the sidebar.
+3. Hover over keywords for definitions, or add/remove keywords manually from highlighted text.
+4. Save transcripts for later review; saved transcripts and keywords are stored in browser `localStorage`.
 
-## Ghi chú
-- Nếu gặp lỗi speech recognition: dùng Chrome/Edge/Safari, kiểm tra quyền micro.
-- Nếu không thấy từ khóa: kiểm tra backend Python đã chạy, transcript đủ dài (>50 ký tự).
-- Đã tối giản tài liệu, chi tiết về công nghệ và các công cụ xem trực tiếp trong code hoặc hỏi AI.
-   ```
-   The Python backend runs on port 5002.
+## Testing
+- Python keyword service smoke test: `python test_backend.py`
+- Health check endpoint: `curl http://localhost:5002/api/health`
 
-3. Test the backend:
-   ```bash
-   python test_backend.py
-   ```
+## Troubleshooting
+- Ensure Chrome, Edge, or Safari has microphone permissions enabled for speech capture.
+- If keywords are missing, confirm the Python service is running on port 5002 and the transcript exceeds roughly 50 characters.
+- When deploying, set `PYTHON_BACKEND_URL` in the Node backend so `/api/analyze` can reach the Flask service.
 
-## 🚀 Quick Start - Run All Services
-
-**Windows PowerShell:**
-```powershell
-.\start-all.ps1
-```
-
-**Manual (3 terminals):**
-```bash
-# Terminal 1 - Node Backend
-cd backend && npm run dev
-
-# Terminal 2 - Python Backend  
-cd python-backend && python app.py
-
-# Terminal 3 - Frontend
-cd frontend && npm run dev
-```
-
-**Access:** http://localhost:5173
-
-## 📖 Using the AI Features
-
-1. Navigate to the Transcription page
-2. Click "Start Recording" or "Realtime" to begin
-3. Speak naturally - AI automatically extracts keywords
-4. Hover over highlighted keywords for definitions
-5. Click "Analyze" to manually trigger keyword extraction
-6. Save transcripts with keywords for later review
-
-## 🧪 Testing Keyword Analysis
-
-Test the Python backend directly:
-```bash
-curl -X POST http://localhost:5002/api/analyze \
-  -H "Content-Type: application/json" \
-  -d '{"transcript": "Machine learning is a branch of artificial intelligence that focuses on building systems that learn from data."}'
-```
-
-## 📚 Complete Documentation
-
-For detailed setup, architecture, and troubleshooting:
-- **[COMPLETE_SETUP_GUIDE.md](./COMPLETE_SETUP_GUIDE.md)** - Full documentation
-- **[python-backend/README.md](./python-backend/README.md)** - Python backend details
-
-## 🛠️ Technology Stack
-
-**Frontend:** React, Vite, Tailwind CSS, Web Speech API, WebSocket  
-**Node Backend:** Express, MongoDB, JWT, Google Speech-to-Text  
-**Python Backend:** Flask, spaCy, KeyBERT, Wikipedia API  
-
-## 🔧 Configuration
-
-**Analysis Settings** (frontend/src/pages/Transcribe.jsx):
-- Debounce time: 2 seconds
-- Min transcript length: 50 characters
-- Analysis trigger: Every 100 new characters
-
-**Backend Settings** (python-backend/app.py):
-- Max keywords: 10-15 per analysis
-- Definition length: 1-2 sentences
-- Port: 5002
-
-## 🐛 Troubleshooting
-
-**Python backend issues:**
-```bash
-# spaCy model missing
-python -m spacy download en_core_web_sm
-
-# Test backend health
-curl http://localhost:5002/api/health
-```
-
-**Speech recognition not working:**
-- Use Chrome, Edge, or Safari
-- Allow microphone permissions
-- Try "Realtime" mode for WebSocket streaming
-
-**Keywords not appearing:**
-- Ensure Python backend is running on port 5002
-- Check transcript has 50+ characters
-- Click "Analyze" manually
-- Check browser console for errors
-
-## 📝 License
-
-Open source - uses MIT licensed components (spaCy, KeyBERT, React, Flask)
-
-3. Start the Vite development server:
-   ```bash
-   npm run dev
-   ```
-4. Open the app at the URL shown in the terminal (typically `http://localhost:5173`).
-
-
+## License
+Released under the MIT license.
