@@ -273,31 +273,34 @@ const Transcribe = () => {
 
   const fetchKeywordDefinition = useCallback(async (word) => {
     try {
-      // Create a sentence with the word for better context
-      const transcript = `Define ${word}`;
-      const response = await fetch(ANALYSIS_API, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transcript })
-      });
-
+      // Query Wikipedia API directly for single word definitions
+      // This is more reliable than sending to Python backend
+      const response = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(word)}`);
+      
       if (!response.ok) {
-        throw new Error('Definition lookup failed');
+        // Fallback: try with title case if lowercase failed
+        const titleCased = word.charAt(0).toUpperCase() + word.slice(1);
+        const fallbackResponse = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(titleCased)}`);
+        
+        if (!fallbackResponse.ok) {
+          return '';
+        }
+        
+        const data = await fallbackResponse.json();
+        const extract = data.extract || '';
+        // Return first 150 characters for brevity
+        return extract.substring(0, 150) + (extract.length > 150 ? '...' : '');
       }
 
       const data = await response.json();
-      const matched = data.keywords?.find(item => item.word.toLowerCase() === word.toLowerCase());
-      if (matched?.definition) {
-        return matched.definition;
-      }
-      
-      // If no match found, try alternative approach: search all keywords
-      return data.keywords?.[0]?.definition || '';
+      const extract = data.extract || '';
+      // Return first 150 characters for brevity
+      return extract.substring(0, 150) + (extract.length > 150 ? '...' : '');
     } catch (error) {
       console.error('Definition fetch error:', error);
       return '';
     }
-  }, [ANALYSIS_API]);
+  }, []);
 
   const triggerAnalysis = useCallback(() => {
     if (transcript.length > 10) {
