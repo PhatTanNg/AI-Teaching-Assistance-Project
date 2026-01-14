@@ -241,7 +241,7 @@ const Transcribe = () => {
         console.log('[KEYWORD] No keywords found in response');
       }
 
-      setLastAnalyzedLength(text.length);
+      setLastAnalyzedLength(cleanedText.length);
     } catch (error) {
       console.error('[KEYWORD] Error analyzing transcript:', error);
       console.error('[KEYWORD] Error details:', error.message);
@@ -251,6 +251,8 @@ const Transcribe = () => {
   }, [ANALYSIS_API]);
 
   useEffect(() => {
+    // Only auto-analyze when recording is active
+    if (!isRecording && !demoMode) return;
     if (!transcript || transcript.length < 20) return;
     if (transcript.length - lastAnalyzedLength < 30) return;
 
@@ -267,14 +269,16 @@ const Transcribe = () => {
         clearTimeout(analysisTimerRef.current);
       }
     };
-  }, [transcript, lastAnalyzedLength, analyzeTranscript]);
+  }, [transcript, lastAnalyzedLength, analyzeTranscript, isRecording, demoMode]);
 
   const fetchKeywordDefinition = useCallback(async (word) => {
     try {
+      // Create a sentence with the word for better context
+      const transcript = `Define ${word}`;
       const response = await fetch(ANALYSIS_API, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transcript: word })
+        body: JSON.stringify({ transcript })
       });
 
       if (!response.ok) {
@@ -283,7 +287,12 @@ const Transcribe = () => {
 
       const data = await response.json();
       const matched = data.keywords?.find(item => item.word.toLowerCase() === word.toLowerCase());
-      return matched?.definition || '';
+      if (matched?.definition) {
+        return matched.definition;
+      }
+      
+      // If no match found, try alternative approach: search all keywords
+      return data.keywords?.[0]?.definition || '';
     } catch (error) {
       console.error('Definition fetch error:', error);
       return '';
