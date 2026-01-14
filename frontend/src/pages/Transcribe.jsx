@@ -83,18 +83,30 @@ const Transcribe = () => {
     recognition.lang = 'en-US';
 
     recognition.onresult = (event) => {
+      let interimTranscript = '';
       let finalTranscript = '';
 
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const transcriptPiece = event.results[i][0].transcript;
         if (event.results[i].isFinal) {
           finalTranscript += transcriptPiece + ' ';
+        } else {
+          interimTranscript += transcriptPiece;
         }
       }
 
-      if (finalTranscript) {
-        setTranscript(prev => prev + finalTranscript);
-      }
+      setTranscript(prev => {
+        // Remove any existing interim text (between | markers)
+        const cleanedPrev = prev.replace(/\s*\|.*\|$/, '');
+        
+        // If we have final results, append them permanently
+        if (finalTranscript) {
+          return cleanedPrev + finalTranscript;
+        }
+        
+        // Otherwise show interim results (without markers, just with | delimiters for easy removal)
+        return cleanedPrev + (interimTranscript ? ' |' + interimTranscript + '|' : '');
+      });
     };
 
     recognition.onerror = (event) => {
@@ -556,6 +568,12 @@ const Transcribe = () => {
     setKeywords(prev => prev.filter(k => k.text !== keyword));
   };
 
+  const splitIntoSentences = (text) => {
+    // Split by periods, question marks, exclamation marks, and commas
+    // Keep the punctuation with the sentence
+    return text.split(/(?<=[.,!?])\s+/).filter(s => s.trim());
+  };
+
   const highlightKeywords = (text) => {
     if (keywords.length === 0) return text;
 
@@ -726,7 +744,6 @@ const Transcribe = () => {
                 background: 'rgba(249, 250, 251, 0.8)', 
                 borderRadius: '0.75rem', 
                 border: '2px dashed rgba(209, 213, 219, 0.8)',
-                whiteSpace: 'pre-wrap',
                 lineHeight: '1.8',
                 fontSize: '1rem',
                 position: 'relative'
@@ -734,68 +751,81 @@ const Transcribe = () => {
               onMouseUp={handleTextSelection}
             >
               {transcript ? (
-                <span>
-                  {Array.isArray(highlightedParts) ? (
-                    highlightedParts.map((part, index) =>
-                      part.isKeyword ? (
-                        <mark
-                          key={`${part.text}-${index}`}
-                          style={{
-                            background: part.keyword.source === 'ai' ? '#dbeafe' : '#fef3c7',
-                            padding: '2px 4px',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            position: 'relative',
-                            border: part.keyword.source === 'ai' ? '1px solid #93c5fd' : '1px solid #fde047'
-                          }}
-                          onMouseEnter={() => setHoveredKeyword(part.keyword)}
-                          onMouseLeave={() => setHoveredKeyword(null)}
-                        >
-                          {part.text}
-                          {hoveredKeyword === part.keyword && part.keyword.explanation && (
-                            <span
-                              style={{
-                                position: 'absolute',
-                                bottom: '100%',
-                                left: '50%',
-                                transform: 'translateX(-50%)',
-                                marginBottom: '8px',
-                                padding: '8px 12px',
-                                background: '#1f2937',
-                                color: 'white',
-                                borderRadius: '8px',
-                                fontSize: '0.875rem',
-                                width: '240px',
-                                zIndex: 1000,
-                                boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-                                pointerEvents: 'none'
-                              }}
-                            >
-                              {part.keyword.explanation}
-                              <span
+                <div>
+                  {splitIntoSentences(transcript).map((sentence, sentenceIndex) => (
+                    <div key={sentenceIndex} style={{ marginBottom: '0.5rem' }}>
+                      {Array.isArray(highlightedParts) ? (
+                        highlightedParts
+                          .filter(part => {
+                            // Find parts that belong to this sentence
+                            const fullText = transcript.replace(/\|/g, '');
+                            const sentenceText = sentence.trim();
+                            return sentenceText.includes(part.text) || part.text.includes(sentenceText.substring(0, 10));
+                          })
+                          .map((part, index) =>
+                            part.isKeyword ? (
+                              <mark
+                                key={`${part.text}-${sentenceIndex}-${index}`}
                                 style={{
-                                  position: 'absolute',
-                                  top: '100%',
-                                  left: '50%',
-                                  transform: 'translateX(-50%)',
-                                  width: 0,
-                                  height: 0,
-                                  borderLeft: '6px solid transparent',
-                                  borderRight: '6px solid transparent',
-                                  borderTop: '6px solid #1f2937'
+                                  background: part.keyword.source === 'ai' ? '#dbeafe' : '#fef3c7',
+                                  padding: '2px 4px',
+                                  borderRadius: '4px',
+                                  cursor: 'pointer',
+                                  position: 'relative',
+                                  border: part.keyword.source === 'ai' ? '1px solid #93c5fd' : '1px solid #fde047'
                                 }}
-                              />
-                            </span>
-                          )}
-                        </mark>
+                                onMouseEnter={() => setHoveredKeyword(part.keyword)}
+                                onMouseLeave={() => setHoveredKeyword(null)}
+                              >
+                                {part.text}
+                                {hoveredKeyword === part.keyword && part.keyword.explanation && (
+                                  <span
+                                    style={{
+                                      position: 'absolute',
+                                      bottom: '100%',
+                                      left: '50%',
+                                      transform: 'translateX(-50%)',
+                                      marginBottom: '8px',
+                                      padding: '8px 12px',
+                                      background: '#1f2937',
+                                      color: 'white',
+                                      borderRadius: '8px',
+                                      fontSize: '0.875rem',
+                                      width: '240px',
+                                      zIndex: 1000,
+                                      boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+                                      pointerEvents: 'none'
+                                    }}
+                                  >
+                                    {part.keyword.explanation}
+                                    <span
+                                      style={{
+                                        position: 'absolute',
+                                        top: '100%',
+                                        left: '50%',
+                                        transform: 'translateX(-50%)',
+                                        width: 0,
+                                        height: 0,
+                                        borderLeft: '6px solid transparent',
+                                        borderRight: '6px solid transparent',
+                                        borderTop: '6px solid #1f2937'
+                                      }}
+                                    />
+                                  </span>
+                                )}
+                              </mark>
+                            ) : (
+                              <span key={`${sentenceIndex}-${index}`}>{part.text}</span>
+                            )
+                          )
+                          .filter(Boolean)
+                          .slice(0, 1) || <span>{sentence.replace(/\|/g, '')}</span>
                       ) : (
-                        <span key={index}>{part.text}</span>
-                      )
-                    )
-                  ) : (
-                    highlightedParts
-                  )}
-                </span>
+                        <span>{sentence.replace(/\|/g, '')}</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
               ) : (
                 <span style={{ color: '#9ca3af' }}>
                   Your transcription will appear here.
