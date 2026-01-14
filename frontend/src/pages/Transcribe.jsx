@@ -180,7 +180,10 @@ const Transcribe = () => {
     if (!text || text.length < 20) return;
 
     setIsAnalyzing(true);
-    console.log('[KEYWORD] Starting analysis for text length:', text.length);
+    // Clean the transcript by removing interim markers
+    const cleanedText = text.replace(/\|/g, '').trim();
+    
+    console.log('[KEYWORD] Starting analysis for text length:', cleanedText.length);
     console.log('[KEYWORD] API endpoint:', ANALYSIS_API);
     
     try {
@@ -188,7 +191,7 @@ const Transcribe = () => {
       const response = await fetch(ANALYSIS_API, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transcript: text })
+        body: JSON.stringify({ transcript: cleanedText })
       });
 
       console.log('[KEYWORD] Response status:', response.status, response.statusText);
@@ -568,16 +571,10 @@ const Transcribe = () => {
     setKeywords(prev => prev.filter(k => k.text !== keyword));
   };
 
-  const splitIntoSentences = (text) => {
-    // Split by periods, question marks, exclamation marks, and commas
-    // Keep the punctuation with the sentence
-    return text.split(/(?<=[.,!?])\s+/).filter(s => s.trim());
-  };
+  const highlightSentence = (sentenceText) => {
+    if (keywords.length === 0) return sentenceText;
 
-  const highlightKeywords = (text) => {
-    if (keywords.length === 0) return text;
-
-    let parts = [{ text, isKeyword: false }];
+    let parts = [{ text: sentenceText, isKeyword: false }];
 
     keywords.forEach(keyword => {
       const newParts = [];
@@ -663,8 +660,6 @@ const Transcribe = () => {
       </div>
     );
   }
-
-  const highlightedParts = highlightKeywords(transcript);
 
   return (
     <div style={{ width: '100%', maxWidth: '1400px', margin: '0 auto', padding: '2rem clamp(1rem, 3vw, 2rem)' }}>
@@ -752,20 +747,17 @@ const Transcribe = () => {
             >
               {transcript ? (
                 <div>
-                  {splitIntoSentences(transcript).map((sentence, sentenceIndex) => (
-                    <div key={sentenceIndex} style={{ marginBottom: '0.5rem' }}>
-                      {Array.isArray(highlightedParts) ? (
-                        highlightedParts
-                          .filter(part => {
-                            // Find parts that belong to this sentence
-                            const fullText = transcript.replace(/\|/g, '');
-                            const sentenceText = sentence.trim();
-                            return sentenceText.includes(part.text) || part.text.includes(sentenceText.substring(0, 10));
-                          })
-                          .map((part, index) =>
+                  {transcript.split(/(?<=[.,!?])\s+/).filter(s => s.trim()).map((sentence, sentenceIndex) => {
+                    const cleanSentence = sentence.replace(/\|/g, '').trim();
+                    const highlightedParts = highlightSentence(cleanSentence);
+                    
+                    return (
+                      <div key={sentenceIndex} style={{ marginBottom: '0.5rem' }}>
+                        {Array.isArray(highlightedParts) ? (
+                          highlightedParts.map((part, partIndex) =>
                             part.isKeyword ? (
                               <mark
-                                key={`${part.text}-${sentenceIndex}-${index}`}
+                                key={`${part.text}-${sentenceIndex}-${partIndex}`}
                                 style={{
                                   background: part.keyword.source === 'ai' ? '#dbeafe' : '#fef3c7',
                                   padding: '2px 4px',
@@ -815,16 +807,15 @@ const Transcribe = () => {
                                 )}
                               </mark>
                             ) : (
-                              <span key={`${sentenceIndex}-${index}`}>{part.text}</span>
+                              <span key={`${sentenceIndex}-${partIndex}`}>{part.text}</span>
                             )
                           )
-                          .filter(Boolean)
-                          .slice(0, 1) || <span>{sentence.replace(/\|/g, '')}</span>
-                      ) : (
-                        <span>{sentence.replace(/\|/g, '')}</span>
-                      )}
-                    </div>
-                  ))}
+                        ) : (
+                          <span>{cleanSentence}</span>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
                 <span style={{ color: '#9ca3af' }}>
