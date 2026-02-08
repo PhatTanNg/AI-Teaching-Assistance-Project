@@ -1,161 +1,344 @@
 import { useState, useEffect } from 'react';
-import { BookMarked, Search, Trash2, ExternalLink } from 'lucide-react';
-import { Input } from '../components/ui/input';
+import { Edit2, Save, X, Trash2, Plus, Search } from 'lucide-react';
 import { Button } from '../components/ui/button';
-import { Textarea } from '../components/ui/textarea';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
+import { Alert, AlertDescription } from '../components/ui/alert';
+import {
+  getTranscripts,
+  getKeywordGroupsByTranscript,
+  updateKeywordDefinition,
+  removeKeywordFromGroup,
+  addKeywordToGroup,
+} from '../api/client';
+import { useAuth } from '../context/AuthContext';
 
 const Keywords = () => {
-  const [keywords, setKeywords] = useState([]);
+  const { token } = useAuth();
+
+  const [transcripts, setTranscripts] = useState([]);
+  const [selectedTranscript, setSelectedTranscript] = useState('');
+  const [keywordGroups, setKeywordGroups] = useState([]);
+  const [editingKeywordId, setEditingKeywordId] = useState(null);
+  const [editingDefinition, setEditingDefinition] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
+  const [newKeywordText, setNewKeywordText] = useState('');
+  const [newKeywordDef, setNewKeywordDef] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [editingKeyword, setEditingKeyword] = useState(null);
-  const [definition, setDefinition] = useState('');
 
+  // Load transcripts on mount
   useEffect(() => {
+    const loadTranscripts = async () => {
+      if (!token) return;
+      try {
+        setLoading(true);
+        const data = await getTranscripts(token);
+        setTranscripts(data);
+      } catch (err) {
+        console.error('Error loading transcripts:', err);
+        setError('Failed to load transcripts');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadTranscripts();
+  }, [token]);
+
+  // Load keyword groups when transcript is selected
+  useEffect(() => {
+    const loadKeywords = async () => {
+      if (!selectedTranscript || !token) return;
+      try {
+        const data = await getKeywordGroupsByTranscript(token, selectedTranscript);
+        setKeywordGroups(data);
+      } catch (err) {
+        console.error('Error loading keywords:', err);
+        setError('Failed to load keywords');
+      }
+    };
+
     loadKeywords();
-  }, []);
+  }, [selectedTranscript, token]);
 
-  const loadKeywords = () => {
-    const saved = JSON.parse(localStorage.getItem('keywords') || '[]');
-    setKeywords(saved);
+  const handleEditDefinition = (keywordId, currentDefinition) => {
+    setEditingKeywordId(keywordId);
+    setEditingDefinition(currentDefinition);
   };
 
-  const saveDefinition = (keywordText) => {
-    const updated = keywords.map(kw => 
-      kw.text === keywordText ? { ...kw, definition } : kw
-    );
-    setKeywords(updated);
-    localStorage.setItem('keywords', JSON.stringify(updated));
-    setEditingKeyword(null);
-    setDefinition('');
-  };
+  const handleSaveDefinition = async (keywordId) => {
+    if (!token || !editingDefinition.trim()) {
+      setError('Definition cannot be empty');
+      return;
+    }
 
-  const deleteKeyword = (keywordText) => {
-    if (confirm('Are you sure you want to delete this keyword?')) {
-      const updated = keywords.filter(kw => kw.text !== keywordText);
-      setKeywords(updated);
-      localStorage.setItem('keywords', JSON.stringify(updated));
+    try {
+      await updateKeywordDefinition(token, keywordId, { definition: editingDefinition.trim() });
+      
+      // Update local state
+      setKeywordGroups(prevGroups =>
+        prevGroups.map(group => ({
+          ...group,
+          keywords: group.keywords.map(kw =>
+            kw._id === keywordId ? { ...kw, definition: editingDefinition.trim() } : kw
+          )
+        }))
+      );
+
+      setEditingKeywordId(null);
+      setEditingDefinition('');
+      setSuccessMessage('Definition updated successfully');
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (err) {
+      console.error('Error updating definition:', err);
+      setError(err?.payload?.error || 'Failed to update definition');
     }
   };
 
-  const startEditing = (keyword) => {
-    setEditingKeyword(keyword.text);
-    setDefinition(keyword.definition || '');
+  const handleDeleteKeyword = async (keywordGroupId, keywordId) => {
+    if (!confirm('Are you sure you want to delete this keyword?')) return;
+
+    if (!token) {
+      setError('Not authenticated');
+      return;
+    }
+
+    try {
+      await removeKeywordFromGroup(token, keywordGroupId, keywordId);
+
+      // Update local state
+      setKeywordGroups(prevGroups =>
+        prevGroups.map(group => ({
+          ...group,
+          keywords: group.keywords.filter(kw => kw._id !== keywordId)
+        }))
+      );
+
+      setSuccessMessage('Keyword deleted successfully');
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (err) {
+      console.error('Error deleting keyword:', err);
+      setError(err?.payload?.error || 'Failed to delete keyword');
+    }
   };
 
-  const searchOnline = (keyword) => {
-    window.open(`https://www.google.com/search?q=define+${encodeURIComponent(keyword)}`, '_blank');
+  const handleAddKeyword = async () => {
+    if (!newKeywordText.trim() || !newKeywordDef.trim() || !token || keywordGroups.length === 0) {
+      setError('Please fill in both fields and select a transcript');
+      return;
+    }
+
+    try {
+      const keywordGroup = keywordGroups[0];
+      const result = await addKeywordToGroup(token, keywordGroup._id, {
+        keywordText: newKeywordText.trim(),
+        definition: newKeywordDef.trim(),
+      });
+
+      setKeywordGroups([result]);
+      setNewKeywordText('');
+      setNewKeywordDef('');
+      setSuccessMessage('Keyword added successfully');
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (err) {
+      console.error('Error adding keyword:', err);
+      setError(err?.payload?.error || 'Failed to add keyword');
+    }
   };
 
-  const filteredKeywords = keywords.filter(kw =>
-    kw.text.toLowerCase().includes(searchTerm.toLowerCase())
+  const allKeywords = keywordGroups.flatMap(g => g.keywords);
+  const filteredKeywords = allKeywords.filter(kw =>
+    kw.keywordText.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  if (loading) {
+    return <div className="page"><p>Loading...</p></div>;
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white py-8">
-      <div className="container mx-auto px-4 max-w-4xl">
-        <div className="mb-8">
-          <h1 className="text-gray-900 mb-2">Keyword Library</h1>
-          <p className="text-gray-600">Manage and define your highlighted terms</p>
-        </div>
+    <div style={{ width: '100%', maxWidth: '1200px', margin: '0 auto', padding: '2rem' }}>
+      <h1 className="card__title">Manage Keywords</h1>
+      <p className="card__subtitle">Edit keyword definitions for your lectures</p>
 
-        <div className="mb-6">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              placeholder="Search keywords..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-        </div>
+      {error && (
+        <Alert variant="destructive" style={{ marginBottom: '1rem' }}>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
-        {filteredKeywords.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-sm border p-12 text-center">
-            <BookMarked className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-gray-900 mb-2">
-              {searchTerm ? 'No keywords found' : 'No keywords yet'}
-            </h3>
-            <p className="text-gray-600">
-              {searchTerm 
-                ? 'Try a different search term'
-                : 'Highlight keywords during transcription to see them here'
-              }
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {filteredKeywords.map((keyword, index) => (
-              <div
-                key={index}
-                className="bg-white rounded-xl shadow-sm border p-6"
-              >
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1">
-                    <h3 className="text-gray-900 mb-1">{keyword.text}</h3>
-                    <p className="text-xs text-gray-500">
-                      Added on {new Date(keyword.timestamp).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => searchOnline(keyword.text)}
-                      className="text-gray-400 hover:text-blue-600 transition-colors"
-                      title="Search online"
-                    >
-                      <ExternalLink className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => deleteKeyword(keyword.text)}
-                      className="text-gray-400 hover:text-red-600 transition-colors"
-                      title="Delete keyword"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
+      {successMessage && (
+        <Alert style={{ marginBottom: '1rem', background: '#dcfce7', border: '1px solid #86efac' }}>
+          <AlertDescription style={{ color: '#166534' }}>{successMessage}</AlertDescription>
+        </Alert>
+      )}
 
-                {editingKeyword === keyword.text ? (
-                  <div className="space-y-3">
-                    <Textarea
-                      placeholder="Enter definition..."
-                      value={definition}
-                      onChange={(e) => setDefinition(e.target.value)}
-                      rows={4}
-                    />
-                    <div className="flex gap-2">
-                      <Button onClick={() => saveDefinition(keyword.text)} size="sm">
-                        Save Definition
-                      </Button>
-                      <Button 
-                        onClick={() => {
-                          setEditingKeyword(null);
-                          setDefinition('');
-                        }} 
-                        variant="outline" 
-                        size="sm"
-                      >
-                        Cancel
-                      </Button>
-                    </div>
-                  </div>
-                ) : keyword.definition ? (
-                  <div>
-                    <p className="text-gray-700 mb-3">{keyword.definition}</p>
-                    <Button onClick={() => startEditing(keyword)} variant="outline" size="sm">
-                      Edit Definition
-                    </Button>
-                  </div>
-                ) : (
-                  <Button onClick={() => startEditing(keyword)} variant="outline" size="sm">
-                    Add Definition
-                  </Button>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
+      <div className="card" style={{ marginBottom: '2rem' }}>
+        <Label className="form-label">Select Transcript</Label>
+        <select
+          value={selectedTranscript}
+          onChange={(e) => setSelectedTranscript(e.target.value)}
+          style={{
+            width: '100%',
+            padding: '0.75rem',
+            borderRadius: '0.5rem',
+            border: '1px solid #ccc',
+            fontSize: '1rem'
+          }}
+        >
+          <option value="">-- Select a transcript --</option>
+          {transcripts.map(transcript => (
+            <option key={transcript._id} value={transcript._id}>
+              {transcript.lectureId?.name} - {new Date(transcript.studyDate).toLocaleDateString()}
+            </option>
+          ))}
+        </select>
       </div>
+
+      {selectedTranscript && (
+        <>
+          {/* Search Bar */}
+          <div className="card" style={{ marginBottom: '2rem' }}>
+            <div style={{ position: 'relative' }}>
+              <Search style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', width: '1rem', height: '1rem', color: '#9ca3af' }} />
+              <Input
+                placeholder="Search keywords..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="form-input"
+                style={{ paddingLeft: '2.5rem' }}
+              />
+            </div>
+          </div>
+
+          {/* Add New Keyword */}
+          <div className="card" style={{ marginBottom: '2rem' }}>
+            <h3 style={{ marginBottom: '1rem', fontSize: '1.125rem', fontWeight: '600' }}>Add New Keyword</h3>
+            <div style={{ display: 'grid', gap: '1rem' }}>
+              <div>
+                <Label className="form-label">Keyword Text</Label>
+                <Input
+                  placeholder="Enter keyword"
+                  value={newKeywordText}
+                  onChange={(e) => setNewKeywordText(e.target.value)}
+                  className="form-input"
+                />
+              </div>
+              <div>
+                <Label className="form-label">Definition</Label>
+                <textarea
+                  placeholder="Enter definition"
+                  value={newKeywordDef}
+                  onChange={(e) => setNewKeywordDef(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid #ccc',
+                    fontSize: '1rem',
+                    fontFamily: 'sans-serif',
+                    minHeight: '100px'
+                  }}
+                />
+              </div>
+              <Button onClick={handleAddKeyword} className="btn btn--primary" style={{ alignSelf: 'flex-start' }}>
+                <Plus style={{ width: '1rem', height: '1rem' }} />
+                Add Keyword
+              </Button>
+            </div>
+          </div>
+
+          {/* Keywords List */}
+          <div className="card">
+            <h3 style={{ marginBottom: '1rem', fontSize: '1.125rem', fontWeight: '600' }}>
+              Keywords ({filteredKeywords.length})
+            </h3>
+
+            {filteredKeywords.length === 0 ? (
+              <p style={{ color: '#9ca3af' }}>
+                {searchTerm ? 'No keywords found' : 'No keywords for this transcript'}
+              </p>
+            ) : (
+              <div style={{ display: 'grid', gap: '1rem' }}>
+                {filteredKeywords.map(keyword => (
+                  <div
+                    key={keyword._id}
+                    style={{
+                      padding: '1rem',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '0.75rem',
+                      background: '#f9fafb'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+                      <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: '600' }}>{keyword.keywordText}</h4>
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        {editingKeywordId === keyword._id ? (
+                          <>
+                            <Button
+                              onClick={() => handleSaveDefinition(keyword._id)}
+                              size="sm"
+                              className="btn btn--primary"
+                            >
+                              <Save style={{ width: '1rem', height: '1rem' }} />
+                            </Button>
+                            <Button
+                              onClick={() => setEditingKeywordId(null)}
+                              size="sm"
+                              className="btn btn--ghost"
+                            >
+                              <X style={{ width: '1rem', height: '1rem' }} />
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <Button
+                              onClick={() => handleEditDefinition(keyword._id, keyword.definition)}
+                              size="sm"
+                              className="btn btn--ghost"
+                            >
+                              <Edit2 style={{ width: '1rem', height: '1rem' }} />
+                            </Button>
+                            <Button
+                              onClick={() => handleDeleteKeyword(keywordGroups[0]._id, keyword._id)}
+                              size="sm"
+                              className="btn btn--ghost"
+                              style={{ color: '#dc2626' }}
+                            >
+                              <Trash2 style={{ width: '1rem', height: '1rem' }} />
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {editingKeywordId === keyword._id ? (
+                      <textarea
+                        value={editingDefinition}
+                        onChange={(e) => setEditingDefinition(e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          borderRadius: '0.5rem',
+                          border: '2px solid #3b82f6',
+                          fontSize: '0.95rem',
+                          fontFamily: 'sans-serif',
+                          minHeight: '80px'
+                        }}
+                      />
+                    ) : (
+                      <p style={{ margin: 0, color: '#4b5563', lineHeight: '1.6' }}>
+                        {keyword.definition || 'No definition'}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 };

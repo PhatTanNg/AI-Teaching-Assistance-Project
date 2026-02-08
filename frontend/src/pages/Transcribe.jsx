@@ -1,9 +1,19 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Mic, Square, Save, Trash2, Highlighter, Play, RefreshCw } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Mic, Square, Save, Trash2, Highlighter, Play, RefreshCw, Plus } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Alert, AlertDescription } from '../components/ui/alert';
+import {
+  createSubject,
+  getSubjects,
+  createLecture,
+  getLecturesBySubject,
+  createTranscript,
+  createKeywordGroup,
+} from '../api/client';
+import { useAuth } from '../context/AuthContext';
 
 // Demo lecture data with keywords
 const DEMO_LECTURE = [
@@ -46,6 +56,9 @@ const DEMO_LECTURE = [
 ];
 
 const Transcribe = () => {
+  const navigate = useNavigate();
+  const { token } = useAuth();
+
   const [isRecording, setIsRecording] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [keywords, setKeywords] = useState([]);
@@ -64,9 +77,57 @@ const Transcribe = () => {
   const sourceNodeRef = useRef(null);
   const processorRef = useRef(null);
   const [isRealtimeStreaming, setIsRealtimeStreaming] = useState(false);
+
+  // NEW: Subject & Lecture state
+  const [subjects, setSubjects] = useState([]);
+  const [selectedSubject, setSelectedSubject] = useState('');
+  const [selectedLecture, setSelectedLecture] = useState('');
+  const [lectures, setLectures] = useState([]);
+  const [newSubjectName, setNewSubjectName] = useState('');
+  const [newLectureName, setNewLectureName] = useState('');
+  const [showNewSubject, setShowNewSubject] = useState(false);
+  const [showNewLecture, setShowNewLecture] = useState(false);
+  const [studyDate, setStudyDate] = useState(new Date().toISOString().split('T')[0]);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const [loading, setLoading] = useState(true);
   
   // Keyword analysis API - proxied through Node.js backend to Python backend
   const ANALYSIS_API = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001').replace(/\/$/, '') + '/api/analyze';
+
+  // NEW: Load subjects on mount
+  useEffect(() => {
+    const loadSubjects = async () => {
+      if (!token) return;
+      try {
+        setLoading(true);
+        const data = await getSubjects(token);
+        setSubjects(data);
+      } catch (error) {
+        console.error('Error loading subjects:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadSubjects();
+  }, [token]);
+
+  // NEW: Load lectures when subject changes
+  useEffect(() => {
+    const loadLectures = async () => {
+      if (!selectedSubject || !token) return;
+      try {
+        const data = await getLecturesBySubject(token, selectedSubject);
+        setLectures(data);
+        setSelectedLecture('');
+      } catch (error) {
+        console.error('Error loading lectures:', error);
+      }
+    };
+
+    loadLectures();
+  }, [selectedSubject, token]);
 
   useEffect(() => {
     // Check if browser supports Speech Recognition
@@ -527,6 +588,36 @@ const Transcribe = () => {
     }
   };
 
+  // NEW: Create new subject
+  const createNewSubject = async () => {
+    if (!newSubjectName.trim() || !token) return;
+    try {
+      const subject = await createSubject(token, { name: newSubjectName.trim() });
+      setSubjects([...subjects, subject]);
+      setSelectedSubject(subject._id);
+      setNewSubjectName('');
+      setShowNewSubject(false);
+    } catch (error) {
+      console.error('Error creating subject:', error);
+      setSaveError('Failed to create subject');
+    }
+  };
+
+  // NEW: Create new lecture
+  const createNewLecture = async () => {
+    if (!newLectureName.trim() || !selectedSubject || !token) return;
+    try {
+      const lecture = await createLecture(token, selectedSubject, { name: newLectureName.trim() });
+      setLectures([...lectures, lecture]);
+      setSelectedLecture(lecture._id);
+      setNewLectureName('');
+      setShowNewLecture(false);
+    } catch (error) {
+      console.error('Error creating lecture:', error);
+      setSaveError('Failed to create lecture');
+    }
+  };
+
   const stopRecording = () => {
     if (demoMode) {
       // Stop demo mode
@@ -623,27 +714,62 @@ const Transcribe = () => {
     return parts;
   };
 
-  const saveTranscript = () => {
-    const transcriptData = {
-      name: lectureName || `Lecture ${new Date().toLocaleDateString()}`,
-      content: transcript,
-      keywords: keywords,
-      date: new Date().toISOString(),
-    };
-    
-    const saved = JSON.parse(localStorage.getItem('transcripts') || '[]');
-    saved.push(transcriptData);
-    localStorage.setItem('transcripts', JSON.stringify(saved));
-    
-    const savedKeywords = JSON.parse(localStorage.getItem('keywords') || '[]');
-    keywords.forEach(kw => {
-      if (!savedKeywords.find(k => k.text === kw.text)) {
-        savedKeywords.push(kw);
+  const saveTranscript = async () => {
+    setSaveError('');
+
+    if (!selectedSubject || !selectedLecture || !transcript.trim()) {
+      setSaveError('Please select a subject, lecture, and provide a transcript');
+      return;
+    }
+
+    if (!token) {
+      setSaveError('Not authenticated');
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+
+      // Create transcript in database
+      const transcriptData = await createTranscript(token, {
+        lectureId: selectedLecture,
+        subjectId: selectedSubject,
+        text: transcript.trim(),
+        studyDate,
+      });
+
+      // Create keyword group if there are keywords
+      if (keywords.length > 0) {
+        const keywordData = keywords.map(k => ({
+          keywordText: k.text,
+          definition: k.explanation || 'No definition provided'
+        }));
+
+        await createKeywordGroup(token, {
+          transcriptId: transcriptData._id,
+          lectureId: selectedLecture,
+          studyDate,
+          keywords: keywordData,
+        });
       }
-    });
-    localStorage.setItem('keywords', JSON.stringify(savedKeywords));
-    
-    alert('Transcript saved successfully');
+
+      // Clear form
+      setTranscript('');
+      setKeywords([]);
+      setSelectedText('');
+      setLastAnalyzedLength(0);
+      setHoveredKeyword(null);
+      setLectureName('');
+
+      alert('Transcript saved successfully!');
+      // Navigate to transcripts page
+      navigate('/transcripts');
+    } catch (error) {
+      console.error('Error saving transcript:', error);
+      setSaveError(error?.payload?.error || error?.message || 'Failed to save transcript');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const clearTranscript = () => {
@@ -673,12 +799,128 @@ const Transcribe = () => {
     );
   }
 
+  if (loading) {
+    return <div className="page"><p>Loading subjects...</p></div>;
+  }
+
   return (
     <div style={{ width: '100%', maxWidth: '1400px', margin: '0 auto', padding: '2rem clamp(1rem, 3vw, 2rem)' }}>
       {/* Header */}
       <div style={{ marginBottom: '2rem' }}>
         <h1 className="card__title">AI-Assisted Live Transcription</h1>
         <p className="card__subtitle">Capture lectures, highlight keywords, and view instant definitions</p>
+      </div>
+
+      {/* Error Alert */}
+      {saveError && (
+        <Alert variant="destructive" style={{ marginBottom: '1rem' }}>
+          <AlertDescription>{saveError}</AlertDescription>
+        </Alert>
+      )}
+
+      {/* NEW: Form Controls */}
+      <div className="card" style={{ marginBottom: '2rem' }}>
+        <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
+          {/* Subject Selection */}
+          <div>
+            <Label className="form-label">Subject *</Label>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <select
+                value={selectedSubject}
+                onChange={(e) => setSelectedSubject(e.target.value)}
+                disabled={isRecording || isRealtimeStreaming}
+                style={{
+                  flex: 1,
+                  padding: '0.5rem',
+                  borderRadius: '0.5rem',
+                  border: '1px solid #ccc',
+                  fontSize: '1rem'
+                }}
+              >
+                <option value="">Select a subject</option>
+                {subjects.map(subject => (
+                  <option key={subject._id} value={subject._id}>{subject.name}</option>
+                ))}
+              </select>
+              <Button
+                onClick={() => setShowNewSubject(!showNewSubject)}
+                className="btn btn--ghost"
+                size="sm"
+                title="Create new subject"
+              >
+                <Plus style={{ width: '1rem', height: '1rem' }} />
+              </Button>
+            </div>
+            {showNewSubject && (
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                <Input
+                  placeholder="Subject name"
+                  value={newSubjectName}
+                  onChange={(e) => setNewSubjectName(e.target.value)}
+                  className="form-input"
+                />
+                <Button onClick={createNewSubject} className="btn btn--primary" size="sm">Create</Button>
+              </div>
+            )}
+          </div>
+
+          {/* Lecture Selection */}
+          <div>
+            <Label className="form-label">Lecture *</Label>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <select
+                value={selectedLecture}
+                onChange={(e) => setSelectedLecture(e.target.value)}
+                disabled={!selectedSubject || isRecording || isRealtimeStreaming}
+                style={{
+                  flex: 1,
+                  padding: '0.5rem',
+                  borderRadius: '0.5rem',
+                  border: '1px solid #ccc',
+                  fontSize: '1rem'
+                }}
+              >
+                <option value="">Select a lecture</option>
+                {lectures.map(lecture => (
+                  <option key={lecture._id} value={lecture._id}>{lecture.name}</option>
+                ))}
+              </select>
+              <Button
+                onClick={() => setShowNewLecture(!showNewLecture)}
+                disabled={!selectedSubject}
+                className="btn btn--ghost"
+                size="sm"
+                title="Create new lecture"
+              >
+                <Plus style={{ width: '1rem', height: '1rem' }} />
+              </Button>
+            </div>
+            {showNewLecture && (
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                <Input
+                  placeholder="Lecture name"
+                  value={newLectureName}
+                  onChange={(e) => setNewLectureName(e.target.value)}
+                  className="form-input"
+                />
+                <Button onClick={createNewLecture} className="btn btn--primary" size="sm">Create</Button>
+              </div>
+            )}
+          </div>
+
+          {/* Study Date */}
+          <div>
+            <Label htmlFor="studyDate" className="form-label">Study Date *</Label>
+            <Input
+              id="studyDate"
+              type="date"
+              value={studyDate}
+              onChange={(e) => setStudyDate(e.target.value)}
+              disabled={isRecording || isRealtimeStreaming}
+              className="form-input"
+            />
+          </div>
+        </div>
       </div>
 
       {/* Two Column Layout */}
@@ -691,50 +933,37 @@ const Transcribe = () => {
         {/* Left Column - Main Transcription */}
         <div className="card">
           <div style={{ display: 'grid', gap: '1rem' }}>
-            <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-              <div style={{ flex: '1', minWidth: '200px' }}>
-                <Label htmlFor="lectureName" className="form-label">Lecture Name</Label>
-                <Input
-                  id="lectureName"
-                  className="form-input"
-                  placeholder="e.g., Introduction to Biology"
-                  value={lectureName}
-                  onChange={(e) => setLectureName(e.target.value)}
-                  disabled={isRealtimeStreaming || demoMode || isRecording}
-                />
-              </div>
-              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                {!isRecording && !isRealtimeStreaming ? (
-                  <>
-                    <Button onClick={startRecording} className="btn btn--primary">
-                      <Mic style={{ width: '1rem', height: '1rem' }} />
-                      Start Recording
-                    </Button>
-                    <Button onClick={startDemo} className="btn btn--ghost">
-                      <Play style={{ width: '1rem', height: '1rem' }} />
-                      Demo
-                    </Button>
-                  </>
-                ) : (
-                  <Button
-                    onClick={isRealtimeStreaming ? stopRealtimeStream : stopRecording}
-                    className="btn"
-                    style={{ background: '#dc2626' }}
-                  >
-                    <Square style={{ width: '1rem', height: '1rem' }} />
-                    Stop
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              {!isRecording && !isRealtimeStreaming ? (
+                <>
+                  <Button onClick={startRecording} className="btn btn--primary">
+                    <Mic style={{ width: '1rem', height: '1rem' }} />
+                    Start Recording
                   </Button>
-                )}
+                  <Button onClick={startDemo} className="btn btn--ghost">
+                    <Play style={{ width: '1rem', height: '1rem' }} />
+                    Demo
+                  </Button>
+                </>
+              ) : (
                 <Button
-                  onClick={triggerAnalysis}
-                  disabled={isAnalyzing || transcript.length < 50}
+                  onClick={isRealtimeStreaming ? stopRealtimeStream : stopRecording}
                   className="btn"
-                  title="Manually trigger AI keyword analysis"
+                  style={{ background: '#dc2626' }}
                 >
-                  <RefreshCw style={{ width: '1rem', height: '1rem' }} />
-                  {isAnalyzing ? 'Analyzing...' : 'Analyze'}
+                  <Square style={{ width: '1rem', height: '1rem' }} />
+                  Stop
                 </Button>
-              </div>
+              )}
+              <Button
+                onClick={() => analyzeTranscript(transcript)}
+                disabled={isAnalyzing || transcript.length < 50}
+                className="btn"
+                title="Manually trigger AI keyword analysis"
+              >
+                <RefreshCw style={{ width: '1rem', height: '1rem' }} />
+                {isAnalyzing ? 'Analyzing...' : 'Analyze'}
+              </Button>
             </div>
 
             {(isRecording || isRealtimeStreaming) && (
@@ -860,9 +1089,13 @@ const Transcribe = () => {
             )}
 
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-              <Button onClick={saveTranscript} disabled={!transcript} className="btn">
+              <Button
+                onClick={saveTranscript}
+                disabled={!transcript || isSaving || !selectedSubject || !selectedLecture}
+                className="btn"
+              >
                 <Save style={{ width: '1rem', height: '1rem' }} />
-                Save Transcript
+                {isSaving ? 'Saving...' : 'Save Transcript'}
               </Button>
               <Button onClick={clearTranscript} disabled={!transcript} className="btn btn--ghost">
                 <Trash2 style={{ width: '1rem', height: '1rem' }} />

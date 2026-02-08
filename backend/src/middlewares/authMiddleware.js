@@ -30,6 +30,7 @@ const protectedRoute = async (req, res, next) => {
 
         //return user data in req object
         req.user = user;
+        req.userId = user._id;
         next();
     });   
     }catch (err) {

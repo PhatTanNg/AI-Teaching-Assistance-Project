@@ -6,6 +6,8 @@ import { connectDB } from "./libs/db.js";
 import authRoute from "./routes/authRoute.js";
 import userRoute from "./routes/userRoute.js";
 import transcribeRoute from "./routes/transcribeRoute.js";
+import subjectRoute from "./routes/subjectRoute.js";
+import contentRoute from "./routes/contentRoute.js";
 import { protectedRoute } from "./middlewares/authMiddleware.js";
 import http from 'http';
 import WebSocket, { WebSocketServer } from 'ws';
@@ -40,6 +42,8 @@ app.use("/api/transcribe", transcribeRoute);
 //private routes
 //app.use(protectedRoute);
 app.use("/api/users",protectedRoute , userRoute);
+app.use("/api/subjects", subjectRoute);
+app.use("/api/content", contentRoute);
 
 // Proxy endpoint for keyword analysis (forwards to Python backend)
 app.post('/api/analyze', async (req, res) => {
