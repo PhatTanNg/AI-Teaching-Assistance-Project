@@ -269,12 +269,209 @@ const Transcripts = () => {
                       <FileText style={{ width: '1.25rem', height: '1.25rem', color: '#0284c7' }} />
                     </div>
                     <button
-                      onClick={() => handleDeleteTranscript(transcript._id, index)}\n                      style={{
+                      onClick={() => handleDeleteTranscript(transcript._id, index)}
+                      style={{
                         background: 'transparent',
-                        border: 'none',\n                        cursor: 'pointer',
-                        color: '#9ca3af'\n                      }}\n                    >\n                      <Trash2 style={{ width: '1rem', height: '1rem' }} />\n                    </button>\n                  </div>\n\n                  <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '0.75rem', lineHeight: '1.3' }}>\n                    {transcript.lectureId?.name || 'Untitled'}\n                  </h3>\n\n                  <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '1rem', display: 'grid', gap: '0.5rem' }}>\n                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>\n                      <Calendar style={{ width: '1rem', height: '1rem' }} />\n                      {new Date(transcript.studyDate).toLocaleDateString()}\n                    </div>\n                  </div>\n\n                  <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '1rem', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>\n                    {transcript.text.substring(0, 100)}...\n                  </p>\n\n                  <Button\n                    onClick={() => viewTranscript(transcript)}\n                    className=\"btn btn--ghost\"\n                    style={{ width: '100%' }}\n                  >\n                    <Eye style={{ width: '1rem', height: '1rem' }} />\n                    View\n                  </Button>\n                </div>\n              ))}\n            </div>\n          )}\n        </>\n      )}\n\n      {/* MODULES TAB */}\n      {activeTab === 'modules' && (\n        <>\n          {/* Create Summary */}\n          <div className=\"card\" style={{ marginBottom: '2rem' }}>\n            <h3 style={{ marginBottom: '1rem', fontSize: '1.125rem', fontWeight: '600' }}>Create New Summary</h3>\n            <div style={{ display: 'grid', gap: '1rem' }}>\n              <div>\n                <Label className=\"form-label\">Select Transcript *</Label>\n                <select\n                  value={newSummaryTranscriptId}\n                  onChange={(e) => setNewSummaryTranscriptId(e.target.value)}\n                  style={{\n                    width: '100%',\n                    padding: '0.75rem',\n                    borderRadius: '0.5rem',\n                    border: '1px solid #ccc',\n                    fontSize: '1rem'\n                  }}\n                >\n                  <option value=\"\">-- Select a transcript --</option>\n                  {transcripts.map(transcript => (\n                    <option key={transcript._id} value={transcript._id}>\n                      {transcript.lectureId?.name} - {new Date(transcript.studyDate).toLocaleDateString()}\n                    </option>\n                  ))}\n                </select>\n              </div>\n              <div>\n                <Label className=\"form-label\">Summary Text *</Label>\n                <textarea\n                  placeholder=\"Enter your summary...\"\n                  value={newSummaryText}\n                  onChange={(e) => setNewSummaryText(e.target.value)}\n                  style={{\n                    width: '100%',\n                    padding: '0.75rem',\n                    borderRadius: '0.5rem',\n                    border: '1px solid #ccc',\n                    fontSize: '1rem',\n                    fontFamily: 'sans-serif',\n                    minHeight: '150px'\n                  }}\n                />\n              </div>\n              <Button\n                onClick={handleCreateSummary}\n                disabled={creatingSummary}\n                className=\"btn btn--primary\"\n                style={{ alignSelf: 'flex-start' }}\n              >\n                <Plus style={{ width: '1rem', height: '1rem' }} />\n                {creatingSummary ? 'Creating...' : 'Create Summary'}\n              </Button>\n            </div>\n          </div>\n\n          {/* Display Modules/Summaries by Subject */}\n          {subjects.length === 0 ? (\n            <div className=\"card\" style={{ textAlign: 'center', padding: '3rem' }}>\n              <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem' }}>No subjects yet</h3>\n              <p style={{ color: '#9ca3af' }}>Create a subject to add summaries</p>\n            </div>\n          ) : (\n            <div style={{ display: 'grid', gap: '2rem' }}>\n              {subjects.map(subject => {\n                const subjectSummaries = summaries[subject._id] || [];\n                return (\n                  <div key={subject._id} className=\"card\">\n                    <h2 style={{ fontSize: '1.25rem', fontWeight: '700', marginBottom: '1.5rem' }}>\n                      {subject.name}\n                    </h2>\n\n                    {subjectSummaries.length === 0 ? (\n                      <p style={{ color: '#9ca3af' }}>No summaries for this subject yet</p>\n                    ) : (\n                      <div style={{ display: 'grid', gap: '1rem' }}>\n                        {subjectSummaries.map(summary => (\n                          <div\n                            key={summary._id}\n                            style={{\n                              padding: '1rem',\n                              border: '1px solid #e5e7eb',\n                              borderRadius: '0.75rem',\n                              background: '#f9fafb'\n                            }}\n                          >\n                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>\n                              <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: '600' }}>\n                                {summary.lectureId?.name}\n                              </h4>\n                              <div style={{ display: 'flex', gap: '0.5rem' }}>\n                                {editingSummaryId === summary._id ? (\n                                  <>\n                                    <Button\n                                      onClick={() => handleSaveSummary(summary._id, subject._id)}\n                                      size=\"sm\"\n                                      className=\"btn btn--primary\"\n                                    >\n                                      <Save style={{ width: '1rem', height: '1rem' }} />\n                                    </Button>\n                                    <Button\n                                      onClick={() => setEditingSummaryId(null)}\n                                      size=\"sm\"\n                                      className=\"btn btn--ghost\"\n                                    >\n                                      <X style={{ width: '1rem', height: '1rem' }} />\n                                    </Button>\n                                  </>\n                                ) : (\n                                  <>\n                                    <Button\n                                      onClick={() => handleEditSummary(summary._id, summary.text)}\n                                      size=\"sm\"\n                                      className=\"btn btn--ghost\"\n                                    >\n                                      <Edit2 style={{ width: '1rem', height: '1rem' }} />\n                                    </Button>\n                                    <Button\n                                      onClick={() => handleDeleteSummary(summary._id, subject._id)}\n                                      size=\"sm\"\n                                      className=\"btn btn--ghost\"\n                                      style={{ color: '#dc2626' }}\n                                    >\n                                      <Trash2 style={{ width: '1rem', height: '1rem' }} />\n                                    </Button>\n                                  </>\n                                )}\n                              </div>\n                            </div>\n\n                            {editingSummaryId === summary._id ? (\n                              <textarea\n                                value={editingSummaryText}\n                                onChange={(e) => setEditingSummaryText(e.target.value)}\n                                style={{\n                                  width: '100%',\n                                  padding: '0.75rem',\n                                  borderRadius: '0.5rem',\n                                  border: '2px solid #3b82f6',\n                                  fontSize: '0.95rem',\n                                  fontFamily: 'sans-serif',\n                                  minHeight: '120px'\n                                }}\n                              />\n                            ) : (\n                              <p style={{ margin: 0, color: '#4b5563', lineHeight: '1.6' }}>\n                                {summary.text}\n                              </p>\n                            )}\n                          </div>\n                        ))}\n                      </div>\n                    )}\n                  </div>\n                );\n              })}\n            </div>\n          )}\n        </>\n      )}
-};
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: '#9ca3af'
+                      }}
+                    >
+                      <Trash2 style={{ width: '1rem', height: '1rem' }} />
+                    </button>
+                  </div>
+
+                  <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '0.75rem', lineHeight: '1.3' }}>
+                    {transcript.lectureId?.name || 'Untitled'}
+                  </h3>
+
+                  <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '1rem', display: 'grid', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <Calendar style={{ width: '1rem', height: '1rem' }} />
+                      {new Date(transcript.studyDate).toLocaleDateString()}
+                    </div>
+                  </div>
+
+                  <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '1rem', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {transcript.text.substring(0, 100)}...
+                  </p>
+
+                  <Button
+                    onClick={() => viewTranscript(transcript)}
+                    className="btn btn--ghost"
+                    style={{ width: '100%' }}
+                  >
+                    <Eye style={{ width: '1rem', height: '1rem' }} />
+                    View
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
         </>
+      )}
+
+      {/* MODULES TAB */}
+      {activeTab === 'modules' && (
+        <>
+          {/* Create Summary */}
+          <div className="card" style={{ marginBottom: '2rem' }}>
+            <h3 style={{ marginBottom: '1rem', fontSize: '1.125rem', fontWeight: '600' }}>Create New Summary</h3>
+            <div style={{ display: 'grid', gap: '1rem' }}>
+              <div>
+                <Label className="form-label">Select Transcript *</Label>
+                <select
+                  value={newSummaryTranscriptId}
+                  onChange={(e) => setNewSummaryTranscriptId(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid #ccc',
+                    fontSize: '1rem'
+                  }}
+                >
+                  <option value="">-- Select a transcript --</option>
+                  {transcripts.map(transcript => (
+                    <option key={transcript._id} value={transcript._id}>
+                      {transcript.lectureId?.name} - {new Date(transcript.studyDate).toLocaleDateString()}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <Label className="form-label">Summary Text *</Label>
+                <textarea
+                  placeholder="Enter your summary..."
+                  value={newSummaryText}
+                  onChange={(e) => setNewSummaryText(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid #ccc',
+                    fontSize: '1rem',
+                    fontFamily: 'sans-serif',
+                    minHeight: '150px'
+                  }}
+                />
+              </div>
+              <Button
+                onClick={handleCreateSummary}
+                disabled={creatingSummary}
+                className="btn btn--primary"
+                style={{ alignSelf: 'flex-start' }}
+              >
+                <Plus style={{ width: '1rem', height: '1rem' }} />
+                {creatingSummary ? 'Creating...' : 'Create Summary'}
+              </Button>
+            </div>
+          </div>
+
+          {/* Display Modules/Summaries by Subject */}
+          {subjects.length === 0 ? (
+            <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
+              <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem' }}>No subjects yet</h3>
+              <p style={{ color: '#9ca3af' }}>Create a subject to add summaries</p>
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gap: '2rem' }}>
+              {subjects.map(subject => {
+                const subjectSummaries = summaries[subject._id] || [];
+                return (
+                  <div key={subject._id} className="card">
+                    <h2 style={{ fontSize: '1.25rem', fontWeight: '700', marginBottom: '1.5rem' }}>
+                      {subject.name}
+                    </h2>
+
+                    {subjectSummaries.length === 0 ? (
+                      <p style={{ color: '#9ca3af' }}>No summaries for this subject yet</p>
+                    ) : (
+                      <div style={{ display: 'grid', gap: '1rem' }}>
+                        {subjectSummaries.map(summary => (
+                          <div
+                            key={summary._id}
+                            style={{
+                              padding: '1rem',
+                              border: '1px solid #e5e7eb',
+                              borderRadius: '0.75rem',
+                              background: '#f9fafb'
+                            }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+                              <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: '600' }}>
+                                {summary.lectureId?.name}
+                              </h4>
+                              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                {editingSummaryId === summary._id ? (
+                                  <>
+                                    <Button
+                                      onClick={() => handleSaveSummary(summary._id, subject._id)}
+                                      size="sm"
+                                      className="btn btn--primary"
+                                    >
+                                      <Save style={{ width: '1rem', height: '1rem' }} />
+                                    </Button>
+                                    <Button
+                                      onClick={() => setEditingSummaryId(null)}
+                                      size="sm"
+                                      className="btn btn--ghost"
+                                    >
+                                      <X style={{ width: '1rem', height: '1rem' }} />
+                                    </Button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Button
+                                      onClick={() => handleEditSummary(summary._id, summary.text)}
+                                      size="sm"
+                                      className="btn btn--ghost"
+                                    >
+                                      <Edit2 style={{ width: '1rem', height: '1rem' }} />
+                                    </Button>
+                                    <Button
+                                      onClick={() => handleDeleteSummary(summary._id, subject._id)}
+                                      size="sm"
+                                      className="btn btn--ghost"
+                                      style={{ color: '#dc2626' }}
+                                    >
+                                      <Trash2 style={{ width: '1rem', height: '1rem' }} />
+                                    </Button>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+
+                            {editingSummaryId === summary._id ? (
+                              <textarea
+                                value={editingSummaryText}
+                                onChange={(e) => setEditingSummaryText(e.target.value)}
+                                style={{
+                                  width: '100%',
+                                  padding: '0.75rem',
+                                  borderRadius: '0.5rem',
+                                  border: '2px solid #3b82f6',
+                                  fontSize: '0.95rem',
+                                  fontFamily: 'sans-serif',
+                                  minHeight: '120px'
+                                }}
+                              />
+                            ) : (
+                              <p style={{ margin: 0, color: '#4b5563', lineHeight: '1.6' }}>
+                                {summary.text}
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
       )}
 
       {/* View Transcript Dialog */}
