@@ -1,18 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mic, Square, Save, Trash2, Highlighter, Play, RefreshCw, Plus } from 'lucide-react';
+import { Mic, Square, Save, Trash2, Highlighter, Play, RefreshCw } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Alert, AlertDescription } from '../components/ui/alert';
-import {
-  createSubject,
-  getSubjects,
-  createLecture,
-  getLecturesBySubject,
-  createTranscript,
-  createKeywordGroup,
-} from '../api/client';
+import { createTranscript } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 
 // Demo lecture data with keywords
@@ -59,78 +52,36 @@ const Transcribe = () => {
   const navigate = useNavigate();
   const { token } = useAuth();
 
+  // Recording & transcript state
   const [isRecording, setIsRecording] = useState(false);
-  const [transcript, setTranscript] = useState('');
+  const [rawTranscript, setRawTranscript] = useState('');
+  const [editedTranscript, setEditedTranscript] = useState('');
   const [keywords, setKeywords] = useState([]);
   const [selectedText, setSelectedText] = useState('');
-  const [lectureName, setLectureName] = useState('');
   const [browserSupported, setBrowserSupported] = useState(true);
   const [demoMode, setDemoMode] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [lastAnalyzedLength, setLastAnalyzedLength] = useState(0);
   const [hoveredKeyword, setHoveredKeyword] = useState(null);
+  
+  // Recording state refs
   const recognitionRef = useRef(null);
   const demoIntervalRef = useRef(null);
   const analysisTimerRef = useRef(null);
-  const wsRef = useRef(null);
-  const audioContextRef = useRef(null);
-  const sourceNodeRef = useRef(null);
-  const processorRef = useRef(null);
   const [isRealtimeStreaming, setIsRealtimeStreaming] = useState(false);
 
-  // NEW: Subject & Lecture state
-  const [subjects, setSubjects] = useState([]);
-  const [selectedSubject, setSelectedSubject] = useState('');
-  const [selectedLecture, setSelectedLecture] = useState('');
-  const [lectures, setLectures] = useState([]);
-  const [newSubjectName, setNewSubjectName] = useState('');
-  const [newLectureName, setNewLectureName] = useState('');
-  const [showNewSubject, setShowNewSubject] = useState(false);
-  const [showNewLecture, setShowNewLecture] = useState(false);
-  const [studyDate, setStudyDate] = useState(new Date().toISOString().split('T')[0]);
+  // Form state
+  const [subject, setSubject] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
-  const [loading, setLoading] = useState(true);
-  
-  // Keyword analysis API - proxied through Node.js backend to Python backend
+  const [isSummarizing, setIsSummarizing] = useState(false);
+  const [transcriptionStopped, setTranscriptionStopped] = useState(false);
+
+  // Keyword analysis API
   const ANALYSIS_API = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001').replace(/\/$/, '') + '/api/analyze';
 
-  // NEW: Load subjects on mount
+  // Initialize speech recognition
   useEffect(() => {
-    const loadSubjects = async () => {
-      if (!token) return;
-      try {
-        setLoading(true);
-        const data = await getSubjects(token);
-        setSubjects(data);
-      } catch (error) {
-        console.error('Error loading subjects:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadSubjects();
-  }, [token]);
-
-  // NEW: Load lectures when subject changes
-  useEffect(() => {
-    const loadLectures = async () => {
-      if (!selectedSubject || !token) return;
-      try {
-        const data = await getLecturesBySubject(token, selectedSubject);
-        setLectures(data);
-        setSelectedLecture('');
-      } catch (error) {
-        console.error('Error loading lectures:', error);
-      }
-    };
-
-    loadLectures();
-  }, [selectedSubject, token]);
-
-  useEffect(() => {
-    // Check if browser supports Speech Recognition
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     
     if (!SpeechRecognition) {
@@ -156,22 +107,16 @@ const Transcribe = () => {
         }
       }
 
-      setTranscript(prev => {
-        // Remove any existing interim text (between | markers)
+      setRawTranscript(prev => {
         const cleanedPrev = prev.replace(/\s*\|.*\|$/, '');
-        
-        // If we have final results, append them permanently
         if (finalTranscript) {
           return cleanedPrev + finalTranscript;
         }
-        
-        // Otherwise show interim results (without markers, just with | delimiters for easy removal)
         return cleanedPrev + (interimTranscript ? ' |' + interimTranscript + '|' : '');
       });
     };
 
     recognition.onerror = (event) => {
-      // Ignore noisy 'no-speech' errors (often harmless)
       if (event.error === 'no-speech') return;
       console.error('Speech recognition error:', event.error);
       setIsRecording(false);
@@ -191,9 +136,10 @@ const Transcribe = () => {
     if (!demoMode) return;
 
     setIsRecording(true);
-    setTranscript('');
+    setTranscriptionStopped(false);
+    setRawTranscript('');
+    setEditedTranscript('');
     setKeywords([]);
-    setLectureName('Demo Lecture - Machine Learning');
     
     let currentIndex = 0;
     
@@ -201,15 +147,14 @@ const Transcribe = () => {
       if (currentIndex >= DEMO_LECTURE.length) {
         setIsRecording(false);
         setDemoMode(false);
+        setTranscriptionStopped(true);
         clearInterval(demoIntervalRef.current);
         return;
       }
 
       const demoWord = DEMO_LECTURE[currentIndex];
-      // Add word to transcript
-      setTranscript(prev => prev + demoWord.word + ' ');
+      setRawTranscript(prev => prev + demoWord.word + ' ');
 
-      // Add keyword if it's marked as one
       if (demoWord.isKeyword) {
         setKeywords(prev => {
           const cleanWord = demoWord.word.replace(/[.,!?;]$/, '');
@@ -227,6 +172,7 @@ const Transcribe = () => {
 
       currentIndex++;
     }, 400);
+
     return () => {
       if (demoIntervalRef.current) {
         clearInterval(demoIntervalRef.current);
@@ -237,35 +183,27 @@ const Transcribe = () => {
     };
   }, [demoMode]);
 
+  // Auto-analyze transcript as user speaks
   const analyzeTranscript = useCallback(async (text) => {
     if (!text || text.length < 20) return;
 
     setIsAnalyzing(true);
-    // Clean the transcript by removing interim markers
     const cleanedText = text.replace(/\|/g, '').trim();
     
-    console.log('[KEYWORD] Starting analysis for text length:', cleanedText.length);
-    console.log('[KEYWORD] API endpoint:', ANALYSIS_API);
-    
     try {
-      console.log('[KEYWORD] Sending request to:', ANALYSIS_API);
       const response = await fetch(ANALYSIS_API, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ transcript: cleanedText })
       });
 
-      console.log('[KEYWORD] Response status:', response.status, response.statusText);
-
       if (!response.ok) {
         throw new Error(`Analysis failed with status ${response.status}`);
       }
 
       const data = await response.json();
-      console.log('[KEYWORD] Analysis response:', data);
       
       if (data.keywords && data.keywords.length > 0) {
-        console.log(`[KEYWORD] Extracted ${data.keywords.length} keywords:`, data.keywords.map(k => k.word));
         setKeywords(prevKeywords => {
           const updated = [...prevKeywords];
 
@@ -277,7 +215,6 @@ const Transcribe = () => {
             if (existingIndex >= 0) {
               const existing = updated[existingIndex];
               if (!existing.explanation && kw.definition) {
-                console.log('[KEYWORD] Updating definition for:', kw.word);
                 updated[existingIndex] = {
                   ...existing,
                   explanation: kw.definition,
@@ -285,7 +222,6 @@ const Transcribe = () => {
                 };
               }
             } else {
-              console.log('[KEYWORD] Adding new keyword:', kw.word);
               updated.push({
                 text: kw.word,
                 explanation: kw.definition,
@@ -295,34 +231,30 @@ const Transcribe = () => {
             }
           });
 
-          console.log('[KEYWORD] Total keywords after update:', updated.length);
           return updated;
         });
-      } else {
-        console.log('[KEYWORD] No keywords found in response');
       }
 
       setLastAnalyzedLength(cleanedText.length);
     } catch (error) {
       console.error('[KEYWORD] Error analyzing transcript:', error);
-      console.error('[KEYWORD] Error details:', error.message);
     } finally {
       setIsAnalyzing(false);
     }
   }, [ANALYSIS_API]);
 
+  // Trigger analysis periodically while recording
   useEffect(() => {
-    // Only auto-analyze when recording is active
     if (!isRecording && !demoMode) return;
-    if (!transcript || transcript.length < 20) return;
-    if (transcript.length - lastAnalyzedLength < 30) return;
+    if (!rawTranscript || rawTranscript.length < 20) return;
+    if (rawTranscript.length - lastAnalyzedLength < 30) return;
 
     if (analysisTimerRef.current) {
       clearTimeout(analysisTimerRef.current);
     }
 
     analysisTimerRef.current = setTimeout(() => {
-      analyzeTranscript(transcript);
+      analyzeTranscript(rawTranscript);
     }, 500);
 
     return () => {
@@ -330,307 +262,30 @@ const Transcribe = () => {
         clearTimeout(analysisTimerRef.current);
       }
     };
-  }, [transcript, lastAnalyzedLength, analyzeTranscript, isRecording, demoMode]);
-
-  const fetchKeywordDefinition = useCallback(async (word) => {
-    try {
-      // Query Wikipedia API directly for single word definitions
-      // This is more reliable than sending to Python backend
-      const response = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(word)}`);
-      
-      if (!response.ok) {
-        // Fallback: try with title case if lowercase failed
-        const titleCased = word.charAt(0).toUpperCase() + word.slice(1);
-        const fallbackResponse = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(titleCased)}`);
-        
-        if (!fallbackResponse.ok) {
-          return '';
-        }
-        
-        const data = await fallbackResponse.json();
-        const extract = data.extract || '';
-        // Return first 150 characters for brevity
-        return extract.substring(0, 150) + (extract.length > 150 ? '...' : '');
-      }
-
-      const data = await response.json();
-      const extract = data.extract || '';
-      // Return first 150 characters for brevity
-      return extract.substring(0, 150) + (extract.length > 150 ? '...' : '');
-    } catch (error) {
-      console.error('Definition fetch error:', error);
-      return '';
-    }
-  }, []);
-
-  const triggerAnalysis = useCallback(() => {
-    if (transcript.length > 10) {
-      analyzeTranscript(transcript);
-    }
-  }, [transcript, analyzeTranscript]);
-
-  const startRealtimeStream = async () => {
-    let stream = null; // declare at function scope to use in handlers
-    try {
-      // open websocket to backend proxy
-      // Always use VITE_API_BASE_URL for websocket (backend on Render)
-      const apiBase = import.meta.env.VITE_API_BASE_URL || 'https://ai-teaching-assistance-project.onrender.com';
-      const wsUrl = apiBase.replace(/^http/, 'ws') + '/ws/realtime-proxy';
-      console.log('Connecting realtime websocket to', wsUrl);
-      let ws;
-      try {
-        ws = new WebSocket(wsUrl);
-      } catch (err) {
-        console.error('Failed to create WebSocket', err);
-        throw err;
-      }
-      wsRef.current = ws;
-      ws.binaryType = 'arraybuffer';
-      wsRef.current = ws;
-
-      ws.onopen = () => {
-        console.log('WebSocket opened, starting audio capture');
-        setIsRealtimeStreaming(true);
-        setTranscript(prev => prev + '\n[Realtime connected]');
-      };
-
-      ws.onmessage = (evt) => {
-        // Google Speech-to-Text responses are JSON strings
-        try {
-          const data = JSON.parse(evt.data);
-          // Google backend sends { type: 'transcript', transcript, isFinal }
-          if (data.type === 'transcript' && data.transcript) {
-            if (data.isFinal) {
-              setTranscript(prev => (prev ? prev + '\n' : '') + data.transcript);
-            } else {
-              setTranscript(prev => prev.split('\n').slice(0, -1).join('\n') + (prev.includes('\n') ? '\n' : '') + data.transcript);
-            }
-          }
-        } catch (e) {
-          // If binary or unexpected message, ignore for now
-        }
-      };
-
-      ws.onerror = (e) => {
-        console.error('Realtime WS error event:', e);
-        console.error('WebSocket readyState:', ws.readyState);
-        setTranscript(prev => prev + '\n[Error: ' + (e?.message || 'WebSocket error') + ']');
-      };
-
-      ws.onclose = (event) => {
-        console.log('Realtime WS close event - code:', event.code, 'reason:', event.reason);
-        console.log('[DEBUG] Cleaning up audio resources after close');
-        setIsRealtimeStreaming(false);
-        setTranscript(prev => prev + '\n[Realtime disconnected - code ' + event.code + ']');
-        // cleanup audio nodes and streams
-        if (processorRef.current) {
-          try { processorRef.current.disconnect(); } catch (e) {}
-          processorRef.current = null;
-        }
-        if (sourceNodeRef.current) {
-          try { sourceNodeRef.current.disconnect(); } catch (e) {}
-          sourceNodeRef.current = null;
-        }
-        // Stop all audio tracks
-        if (stream) {
-          try {
-            console.log('[DEBUG] Stopping audio tracks');
-            stream.getTracks().forEach(track => track.stop());
-          } catch (e) {}
-        }
-        if (audioContextRef.current) {
-          try { audioContextRef.current.close(); } catch (e) {}
-          audioContextRef.current = null;
-        }
-      };
-
-      // start capturing audio
-      console.log('[DEBUG] Requesting microphone access...');
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      console.log('[DEBUG] Microphone access granted, sample rate:', stream.getTracks()[0].getSettings().sampleRate);
-      
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      audioContextRef.current = audioContext;
-      const source = audioContext.createMediaStreamSource(stream);
-      sourceNodeRef.current = source;
-
-      // Use ScriptProcessor for reliable audio capture
-      // Note: ScriptProcessor is deprecated but AudioWorklet has compatibility issues in some browsers
-      // A proper AudioWorklet would require external module files, so we use the proven ScriptProcessor
-      const processor = audioContext.createScriptProcessor(4096, 1, 1);
-      processorRef.current = processor;
-
-      // Voice Activity Detection (VAD) - only send audio when speech is detected
-      let silenceCounter = 0;
-      const SILENCE_THRESHOLD = 0.005; // Lower threshold for more sensitive speech detection
-      const SILENCE_DURATION = 10; // frames of silence before stopping transmission
-      let isSpeaking = false;
-
-      // Helper: calculate RMS (root mean square) energy of audio frame
-      function calculateRMS(audioData) {
-        let sum = 0;
-        for (let i = 0; i < audioData.length; i++) {
-          sum += audioData[i] * audioData[i];
-        }
-        return Math.sqrt(sum / audioData.length);
-      }
-
-      processor.onaudioprocess = (event) => {
-        try {
-          const inputData = event.inputBuffer.getChannelData(0);
-          
-          // Calculate audio energy to detect speech
-          const rms = calculateRMS(inputData);
-          const hasSpeech = rms > SILENCE_THRESHOLD;
-
-          if (hasSpeech) {
-            silenceCounter = 0;
-            isSpeaking = true;
-          } else {
-            silenceCounter++;
-            if (silenceCounter >= SILENCE_DURATION) {
-              isSpeaking = false;
-            }
-          }
-
-          // Only send audio if we're detecting speech or still in grace period
-          if (isSpeaking && ws && ws.readyState === WebSocket.OPEN) {
-            const downsampled = downsampleBuffer(inputData, audioContext.sampleRate, 16000);
-            const pcm16 = floatTo16BitPCM(downsampled);
-            ws.send(pcm16);
-            // Log every 10th frame to avoid spam
-            if (Math.random() < 0.1) {
-              console.log('[AUDIO] Sent frame, size:', pcm16.byteLength, 'RMS:', rms.toFixed(4));
-            }
-          } else {
-            if (Math.random() < 0.05) {
-              console.log('[AUDIO] Silence detected, RMS:', rms.toFixed(4));
-            }
-          }
-        } catch (e) {
-          console.error('Error in audio processing:', e.message);
-        }
-      };
-
-      // Helper: downsample Float32Array from input sample rate to target sample rate
-      function downsampleBuffer(buffer, inputSampleRate, outputSampleRate) {
-        if (outputSampleRate === inputSampleRate) {
-          return buffer;
-        }
-        if (outputSampleRate > inputSampleRate) {
-          throw new Error('downsampling rate should be smaller than original sample rate');
-        }
-        const sampleRateRatio = inputSampleRate / outputSampleRate;
-        const newLength = Math.round(buffer.length / sampleRateRatio);
-        const result = new Float32Array(newLength);
-        let offsetResult = 0;
-        let offsetBuffer = 0;
-        while (offsetResult < newLength) {
-          const nextOffsetBuffer = Math.round((offsetResult + 1) * sampleRateRatio);
-          let accum = 0, count = 0;
-          for (let i = offsetBuffer; i < nextOffsetBuffer && i < buffer.length; i++) {
-            accum += buffer[i];
-            count++;
-          }
-          result[offsetResult] = count ? (accum / count) : 0;
-          offsetResult++;
-          offsetBuffer = nextOffsetBuffer;
-        }
-        return result;
-      }
-
-      // Helper: convert Float32Array [-1,1] to 16-bit PCM ArrayBuffer (little-endian)
-      function floatTo16BitPCM(float32Array) {
-        const buffer = new ArrayBuffer(float32Array.length * 2);
-        const view = new DataView(buffer);
-        for (let i = 0; i < float32Array.length; i++) {
-          let s = Math.max(-1, Math.min(1, float32Array[i]));
-          view.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
-        }
-        return buffer;
-      }
-
-      source.connect(processor);
-      processor.connect(audioContext.destination);
-    } catch (err) {
-      console.error('Realtime start error:', err.message);
-      console.error('Stack:', err.stack);
-      setIsRealtimeStreaming(false);
-      // Cleanup on error
-      if (stream) {
-        try {
-          stream.getTracks().forEach(track => track.stop());
-        } catch (e) {}
-      }
-      alert('Unable to start realtime streaming: ' + (err.message || 'Unknown error'));
-    }
-  };
-
-  const stopRealtimeStream = () => {
-    console.log('[DEBUG] Stop realtime stream called');
-    try {
-      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        console.log('[DEBUG] Closing WebSocket');
-        wsRef.current.close(1000, 'User requested stop');
-      } else {
-        console.log('[DEBUG] WebSocket not open, readyState:', wsRef.current?.readyState);
-      }
-    } catch (e) {
-      console.warn('Error closing realtime ws', e);
-    }
-    setIsRealtimeStreaming(false);
-  };
+  }, [rawTranscript, lastAnalyzedLength, analyzeTranscript, isRecording, demoMode]);
 
   const startRecording = () => {
     if (recognitionRef.current) {
       recognitionRef.current.start();
       setIsRecording(true);
-    }
-  };
-
-  // NEW: Create new subject
-  const createNewSubject = async () => {
-    if (!newSubjectName.trim() || !token) return;
-    try {
-      const subject = await createSubject(token, { name: newSubjectName.trim() });
-      setSubjects([...subjects, subject]);
-      setSelectedSubject(subject._id);
-      setNewSubjectName('');
-      setShowNewSubject(false);
-    } catch (error) {
-      console.error('Error creating subject:', error);
-      setSaveError('Failed to create subject');
-    }
-  };
-
-  // NEW: Create new lecture
-  const createNewLecture = async () => {
-    if (!newLectureName.trim() || !selectedSubject || !token) return;
-    try {
-      const lecture = await createLecture(token, selectedSubject, { name: newLectureName.trim() });
-      setLectures([...lectures, lecture]);
-      setSelectedLecture(lecture._id);
-      setNewLectureName('');
-      setShowNewLecture(false);
-    } catch (error) {
-      console.error('Error creating lecture:', error);
-      setSaveError('Failed to create lecture');
+      setTranscriptionStopped(false);
     }
   };
 
   const stopRecording = () => {
     if (demoMode) {
-      // Stop demo mode
       setDemoMode(false);
       if (demoIntervalRef.current) {
         clearInterval(demoIntervalRef.current);
       }
-      setIsRecording(false);
     } else if (recognitionRef.current) {
-      // Stop real recording
       recognitionRef.current.stop();
-      setIsRecording(false);
     }
+    setIsRecording(false);
+    setTranscriptionStopped(true);
+    
+    // Initialize edited transcript with raw transcript content
+    setEditedTranscript(rawTranscript.replace(/\|/g, '').trim());
   };
 
   const startDemo = () => {
@@ -645,6 +300,32 @@ const Transcribe = () => {
       setSelectedText(text);
     }
   };
+
+  const fetchKeywordDefinition = useCallback(async (word) => {
+    try {
+      const response = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(word)}`);
+      
+      if (!response.ok) {
+        const titleCased = word.charAt(0).toUpperCase() + word.slice(1);
+        const fallbackResponse = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(titleCased)}`);
+        
+        if (!fallbackResponse.ok) {
+          return '';
+        }
+        
+        const data = await fallbackResponse.json();
+        const extract = data.extract || '';
+        return extract.substring(0, 150) + (extract.length > 150 ? '...' : '');
+      }
+
+      const data = await response.json();
+      const extract = data.extract || '';
+      return extract.substring(0, 150) + (extract.length > 150 ? '...' : '');
+    } catch (error) {
+      console.error('Definition fetch error:', error);
+      return '';
+    }
+  }, []);
 
   const addKeyword = async () => {
     if (!selectedText || keywords.find(k => k.text === selectedText)) {
@@ -714,11 +395,18 @@ const Transcribe = () => {
     return parts;
   };
 
+  /**
+   * Save transcript workflow:
+   * 1. Send edited transcript to backend
+   * 2. Backend automatically generates summary using OpenAI API
+   * 3. Summary is stored in the transcript record
+   * 4. User is redirected to transcripts page
+   */
   const saveTranscript = async () => {
     setSaveError('');
 
-    if (!selectedSubject || !selectedLecture || !transcript.trim()) {
-      setSaveError('Please select a subject, lecture, and provide a transcript');
+    if (!subject.trim() || !editedTranscript.trim()) {
+      setSaveError('Please enter a subject and provide a transcript');
       return;
     }
 
@@ -730,38 +418,24 @@ const Transcribe = () => {
     try {
       setIsSaving(true);
 
-      // Create transcript in database
+      // Save transcript with edited content
+      // The backend will automatically trigger OpenAI summarization
       const transcriptData = await createTranscript(token, {
-        lectureId: selectedLecture,
-        subjectId: selectedSubject,
-        text: transcript.trim(),
-        studyDate,
+        subject: subject.trim(),
+        rawTranscript: editedTranscript.trim(),
       });
 
-      // Create keyword group if there are keywords
-      if (keywords.length > 0) {
-        const keywordData = keywords.map(k => ({
-          keywordText: k.text,
-          definition: k.explanation || 'No definition provided'
-        }));
-
-        await createKeywordGroup(token, {
-          transcriptId: transcriptData._id,
-          lectureId: selectedLecture,
-          studyDate,
-          keywords: keywordData,
-        });
-      }
-
       // Clear form
-      setTranscript('');
+      setRawTranscript('');
+      setEditedTranscript('');
       setKeywords([]);
       setSelectedText('');
       setLastAnalyzedLength(0);
       setHoveredKeyword(null);
-      setLectureName('');
+      setSubject('');
+      setTranscriptionStopped(false);
 
-      alert('Transcript saved successfully!');
+      alert('Transcript saved successfully! Summary is being generated...');
       // Navigate to transcripts page
       navigate('/transcripts');
     } catch (error) {
@@ -774,12 +448,14 @@ const Transcribe = () => {
 
   const clearTranscript = () => {
     if (confirm('Are you sure you want to clear this transcript?')) {
-      setTranscript('');
+      setRawTranscript('');
+      setEditedTranscript('');
       setKeywords([]);
-      setLectureName('');
+      setSubject('');
       setLastAnalyzedLength(0);
       setHoveredKeyword(null);
       setIsAnalyzing(false);
+      setTranscriptionStopped(false);
       if (analysisTimerRef.current) {
         clearTimeout(analysisTimerRef.current);
         analysisTimerRef.current = null;
@@ -799,16 +475,12 @@ const Transcribe = () => {
     );
   }
 
-  if (loading) {
-    return <div className="page"><p>Loading subjects...</p></div>;
-  }
-
   return (
     <div style={{ width: '100%', maxWidth: '1400px', margin: '0 auto', padding: '2rem clamp(1rem, 3vw, 2rem)' }}>
       {/* Header */}
       <div style={{ marginBottom: '2rem' }}>
         <h1 className="card__title">AI-Assisted Live Transcription</h1>
-        <p className="card__subtitle">Capture lectures, highlight keywords, and view instant definitions</p>
+        <p className="card__subtitle">Capture lectures, highlight keywords, and auto-generate summaries</p>
       </div>
 
       {/* Error Alert */}
@@ -818,104 +490,16 @@ const Transcribe = () => {
         </Alert>
       )}
 
-      {/* NEW: Form Controls */}
+      {/* Form Controls */}
       <div className="card" style={{ marginBottom: '2rem' }}>
         <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
-          {/* Subject Selection */}
+          {/* Subject Input */}
           <div>
-            <Label className="form-label">Subject *</Label>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <select
-                value={selectedSubject}
-                onChange={(e) => setSelectedSubject(e.target.value)}
-                disabled={isRecording || isRealtimeStreaming}
-                style={{
-                  flex: 1,
-                  padding: '0.5rem',
-                  borderRadius: '0.5rem',
-                  border: '1px solid #ccc',
-                  fontSize: '1rem'
-                }}
-              >
-                <option value="">Select a subject</option>
-                {subjects.map(subject => (
-                  <option key={subject._id} value={subject._id}>{subject.name}</option>
-                ))}
-              </select>
-              <Button
-                onClick={() => setShowNewSubject(!showNewSubject)}
-                className="btn btn--ghost"
-                size="sm"
-                title="Create new subject"
-              >
-                <Plus style={{ width: '1rem', height: '1rem' }} />
-              </Button>
-            </div>
-            {showNewSubject && (
-              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                <Input
-                  placeholder="Subject name"
-                  value={newSubjectName}
-                  onChange={(e) => setNewSubjectName(e.target.value)}
-                  className="form-input"
-                />
-                <Button onClick={createNewSubject} className="btn btn--primary" size="sm">Create</Button>
-              </div>
-            )}
-          </div>
-
-          {/* Lecture Selection */}
-          <div>
-            <Label className="form-label">Lecture *</Label>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <select
-                value={selectedLecture}
-                onChange={(e) => setSelectedLecture(e.target.value)}
-                disabled={!selectedSubject || isRecording || isRealtimeStreaming}
-                style={{
-                  flex: 1,
-                  padding: '0.5rem',
-                  borderRadius: '0.5rem',
-                  border: '1px solid #ccc',
-                  fontSize: '1rem'
-                }}
-              >
-                <option value="">Select a lecture</option>
-                {lectures.map(lecture => (
-                  <option key={lecture._id} value={lecture._id}>{lecture.name}</option>
-                ))}
-              </select>
-              <Button
-                onClick={() => setShowNewLecture(!showNewLecture)}
-                disabled={!selectedSubject}
-                className="btn btn--ghost"
-                size="sm"
-                title="Create new lecture"
-              >
-                <Plus style={{ width: '1rem', height: '1rem' }} />
-              </Button>
-            </div>
-            {showNewLecture && (
-              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                <Input
-                  placeholder="Lecture name"
-                  value={newLectureName}
-                  onChange={(e) => setNewLectureName(e.target.value)}
-                  className="form-input"
-                />
-                <Button onClick={createNewLecture} className="btn btn--primary" size="sm">Create</Button>
-              </div>
-            )}
-          </div>
-
-          {/* Study Date */}
-          <div>
-            <Label htmlFor="studyDate" className="form-label">Study Date *</Label>
+            <Label className="form-label">Subject/Course Name *</Label>
             <Input
-              id="studyDate"
-              type="date"
-              value={studyDate}
-              onChange={(e) => setStudyDate(e.target.value)}
+              placeholder="e.g., Machine Learning 101"
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
               disabled={isRecording || isRealtimeStreaming}
               className="form-input"
             />
@@ -933,6 +517,7 @@ const Transcribe = () => {
         {/* Left Column - Main Transcription */}
         <div className="card">
           <div style={{ display: 'grid', gap: '1rem' }}>
+            {/* Recording Controls */}
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
               {!isRecording && !isRealtimeStreaming ? (
                 <>
@@ -947,17 +532,17 @@ const Transcribe = () => {
                 </>
               ) : (
                 <Button
-                  onClick={isRealtimeStreaming ? stopRealtimeStream : stopRecording}
+                  onClick={stopRecording}
                   className="btn"
                   style={{ background: '#dc2626' }}
                 >
                   <Square style={{ width: '1rem', height: '1rem' }} />
-                  Stop
+                  Stop Recording
                 </Button>
               )}
               <Button
-                onClick={() => analyzeTranscript(transcript)}
-                disabled={isAnalyzing || transcript.length < 50}
+                onClick={() => analyzeTranscript(rawTranscript)}
+                disabled={isAnalyzing || rawTranscript.length < 50}
                 className="btn"
                 title="Manually trigger AI keyword analysis"
               >
@@ -973,100 +558,128 @@ const Transcribe = () => {
               </div>
             )}
 
-            <div 
-              style={{ 
-                minHeight: '400px', 
-                padding: '1rem', 
-                background: 'rgba(249, 250, 251, 0.8)', 
-                borderRadius: '0.75rem', 
-                border: '2px dashed rgba(209, 213, 219, 0.8)',
-                lineHeight: '1.8',
-                fontSize: '1rem',
-                position: 'relative'
-              }}
-              onMouseUp={handleTextSelection}
-            >
-              {transcript ? (
-                <div>
-                  {transcript.split(/(?<=[.,!?])\s+/).filter(s => s.trim()).map((sentence, sentenceIndex) => {
-                    const cleanSentence = sentence.replace(/\|/g, '').trim();
-                    const highlightedParts = highlightSentence(cleanSentence);
-                    
-                    return (
-                      <div key={sentenceIndex} style={{ marginBottom: '0.5rem' }}>
-                        {Array.isArray(highlightedParts) ? (
-                          highlightedParts.map((part, partIndex) =>
-                            part.isKeyword ? (
-                              <mark
-                                key={`${part.text}-${sentenceIndex}-${partIndex}`}
-                                style={{
-                                  background: part.keyword.source === 'ai' ? '#dbeafe' : '#fef3c7',
-                                  padding: '2px 4px',
-                                  borderRadius: '4px',
-                                  cursor: 'pointer',
-                                  position: 'relative',
-                                  border: part.keyword.source === 'ai' ? '1px solid #93c5fd' : '1px solid #fde047'
-                                }}
-                                onMouseEnter={() => setHoveredKeyword(part.keyword)}
-                                onMouseLeave={() => setHoveredKeyword(null)}
-                              >
-                                {part.text}
-                                {hoveredKeyword === part.keyword && part.keyword.explanation && (
-                                  <span
-                                    style={{
-                                      position: 'absolute',
-                                      bottom: '100%',
-                                      left: '50%',
-                                      transform: 'translateX(-50%)',
-                                      marginBottom: '8px',
-                                      padding: '8px 12px',
-                                      background: '#1f2937',
-                                      color: 'white',
-                                      borderRadius: '8px',
-                                      fontSize: '0.875rem',
-                                      width: '240px',
-                                      zIndex: 1000,
-                                      boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-                                      pointerEvents: 'none'
-                                    }}
-                                  >
-                                    {part.keyword.explanation}
+            {/* Transcript Display/Edit */}
+            {!transcriptionStopped ? (
+              // While recording: show read-only display
+              <div 
+                style={{ 
+                  minHeight: '400px', 
+                  padding: '1rem', 
+                  background: 'rgba(249, 250, 251, 0.8)', 
+                  borderRadius: '0.75rem', 
+                  border: '2px dashed rgba(209, 213, 219, 0.8)',
+                  lineHeight: '1.8',
+                  fontSize: '1rem',
+                  position: 'relative',
+                  wordWrap: 'break-word',
+                  overflowY: 'auto'
+                }}
+                onMouseUp={handleTextSelection}
+              >
+                {rawTranscript ? (
+                  <div>
+                    {rawTranscript.split(/(?<=[.,!?])\s+/).filter(s => s.trim()).map((sentence, sentenceIndex) => {
+                      const cleanSentence = sentence.replace(/\|/g, '').trim();
+                      const highlightedParts = highlightSentence(cleanSentence);
+                      
+                      return (
+                        <div key={sentenceIndex} style={{ marginBottom: '0.5rem' }}>
+                          {Array.isArray(highlightedParts) ? (
+                            highlightedParts.map((part, partIndex) =>
+                              part.isKeyword ? (
+                                <mark
+                                  key={`${part.text}-${sentenceIndex}-${partIndex}`}
+                                  style={{
+                                    background: part.keyword.source === 'ai' ? '#dbeafe' : '#fef3c7',
+                                    padding: '2px 4px',
+                                    borderRadius: '4px',
+                                    cursor: 'pointer',
+                                    position: 'relative',
+                                    border: part.keyword.source === 'ai' ? '1px solid #93c5fd' : '1px solid #fde047'
+                                  }}
+                                  onMouseEnter={() => setHoveredKeyword(part.keyword)}
+                                  onMouseLeave={() => setHoveredKeyword(null)}
+                                >
+                                  {part.text}
+                                  {hoveredKeyword === part.keyword && part.keyword.explanation && (
                                     <span
                                       style={{
                                         position: 'absolute',
-                                        top: '100%',
+                                        bottom: '100%',
                                         left: '50%',
                                         transform: 'translateX(-50%)',
-                                        width: 0,
-                                        height: 0,
-                                        borderLeft: '6px solid transparent',
-                                        borderRight: '6px solid transparent',
-                                        borderTop: '6px solid #1f2937'
+                                        marginBottom: '8px',
+                                        padding: '8px 12px',
+                                        background: '#1f2937',
+                                        color: 'white',
+                                        borderRadius: '8px',
+                                        fontSize: '0.875rem',
+                                        width: '240px',
+                                        zIndex: 1000,
+                                        boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+                                        pointerEvents: 'none'
                                       }}
-                                    />
-                                  </span>
-                                )}
-                              </mark>
-                            ) : (
-                              <span key={`${sentenceIndex}-${partIndex}`}>{part.text}</span>
+                                    >
+                                      {part.keyword.explanation}
+                                      <span
+                                        style={{
+                                          position: 'absolute',
+                                          top: '100%',
+                                          left: '50%',
+                                          transform: 'translateX(-50%)',
+                                          width: 0,
+                                          height: 0,
+                                          borderLeft: '6px solid transparent',
+                                          borderRight: '6px solid transparent',
+                                          borderTop: '6px solid #1f2937'
+                                        }}
+                                      />
+                                    </span>
+                                  )}
+                                </mark>
+                              ) : (
+                                <span key={`${sentenceIndex}-${partIndex}`}>{part.text}</span>
+                              )
                             )
-                          )
-                        ) : (
-                          <span>{cleanSentence}</span>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <span style={{ color: '#9ca3af' }}>
-                  Your transcription will appear here.
-                  <br />
-                  <br />
-                  <small>The assistant will extract keywords and definitions automatically as you speak.</small>
-                </span>
-              )}
-            </div>
+                          ) : (
+                            <span>{cleanSentence}</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <span style={{ color: '#9ca3af' }}>
+                    Your transcription will appear here.
+                    <br />
+                    <br />
+                    <small>The assistant will extract keywords and definitions automatically as you speak.</small>
+                  </span>
+                )}
+              </div>
+            ) : (
+              // After stop: show editable textarea
+              <div>
+                <Label style={{ marginBottom: '0.5rem', display: 'block' }}>Edit Transcript</Label>
+                <textarea
+                  value={editedTranscript}
+                  onChange={(e) => setEditedTranscript(e.target.value)}
+                  style={{
+                    width: '100%',
+                    minHeight: '400px',
+                    padding: '1rem',
+                    border: '2px solid #93c5fd',
+                    borderRadius: '0.75rem',
+                    fontFamily: 'monospace',
+                    fontSize: '1rem',
+                    lineHeight: '1.8',
+                    resize: 'both',
+                    fontFamily: 'inherit'
+                  }}
+                  placeholder="Your transcript will appear here. You can edit it before saving."
+                />
+              </div>
+            )}
 
             {selectedText && (
               <div style={{ 
@@ -1088,20 +701,38 @@ const Transcribe = () => {
               </div>
             )}
 
+            {/* Save/Clear Buttons */}
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
               <Button
                 onClick={saveTranscript}
-                disabled={!transcript || isSaving || !selectedSubject || !selectedLecture}
+                disabled={!editedTranscript || isSaving || !subject}
                 className="btn"
               >
                 <Save style={{ width: '1rem', height: '1rem' }} />
                 {isSaving ? 'Saving...' : 'Save Transcript'}
               </Button>
-              <Button onClick={clearTranscript} disabled={!transcript} className="btn btn--ghost">
+              <Button 
+                onClick={clearTranscript} 
+                disabled={!rawTranscript && !editedTranscript} 
+                className="btn btn--ghost"
+              >
                 <Trash2 style={{ width: '1rem', height: '1rem' }} />
                 Clear
               </Button>
             </div>
+
+            {isSummarizing && (
+              <div style={{
+                padding: '1rem',
+                background: '#dbeafe',
+                border: '1px solid #93c5fd',
+                borderRadius: '0.75rem',
+                fontSize: '0.875rem',
+                color: '#0c4a6e'
+              }}>
+                ⏳ Generating summary... This will happen automatically after you save.
+              </div>
+            )}
           </div>
         </div>
 

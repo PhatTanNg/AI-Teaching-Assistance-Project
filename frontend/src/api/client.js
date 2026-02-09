@@ -75,15 +75,15 @@ export const deleteLecture = (token, lectureId) =>
 
 // ==================== TRANSCRIPT ENDPOINTS ====================
 
-export const createTranscript = (token, { lectureId, subjectId, text, studyDate }) =>
+export const createTranscript = (token, { subject, rawTranscript }) =>
   apiClient('/api/content/transcripts', {
     method: 'POST',
     token,
-    data: { lectureId, subjectId, text, studyDate },
+    data: { subject, rawTranscript },
   });
 
-export const getTranscripts = (token, lectureId) =>
-  apiClient(`/api/content/transcripts${lectureId ? `?lectureId=${lectureId}` : ''}`, {
+export const getTranscripts = (token) =>
+  apiClient('/api/content/transcripts', {
     method: 'GET',
     token,
   });
@@ -91,11 +91,11 @@ export const getTranscripts = (token, lectureId) =>
 export const getTranscriptById = (token, transcriptId) =>
   apiClient(`/api/content/transcripts/${transcriptId}`, { method: 'GET', token });
 
-export const updateTranscriptText = (token, transcriptId, { text }) =>
+export const updateTranscriptText = (token, transcriptId, { rawTranscript, summary }) =>
   apiClient(`/api/content/transcripts/${transcriptId}`, {
     method: 'PUT',
     token,
-    data: { text },
+    data: { rawTranscript, summary },
   });
 
 export const deleteTranscript = (token, transcriptId) =>

@@ -3,39 +3,72 @@ import KeywordGroup from '../models/KeywordGroup.js';
 import Keyword from '../models/Keyword.js';
 import Summary from '../models/Summary.js';
 import Lecture from '../models/Lecture.js';
+import { generateSummary } from '../services/summaryService.js';
 
 // ==================== TRANSCRIPT CONTROLLERS ====================
 
+/**
+ * Create a new transcript with automatic summarization
+ * Workflow:
+ * 1. Save the transcript with rawTranscript text
+ * 2. Automatically send transcript to OpenAI for summarization
+ * 3. Store the generated summary in the transcript record
+ * 4. Return the transcript with summary (or without if summarization fails)
+ * 
+ * Error handling: If summarization fails, the transcript is still saved successfully.
+ * The summary field remains empty and can be manually edited or generated later.
+ */
 export const createTranscript = async (req, res) => {
   try {
-    const { lectureId, subjectId, text, studyDate } = req.body;
+    const { subject, rawTranscript } = req.body;
     const userId = req.userId;
 
     if (!userId) {
       return res.status(401).json({ error: 'User not authenticated' });
     }
 
-    if (!lectureId || !subjectId || !studyDate) {
-      return res.status(400).json({
-        error: 'lectureId, subjectId, and studyDate are required',
-      });
+    if (!subject || !subject.trim()) {
+      return res.status(400).json({ error: 'subject is required' });
     }
 
-    // Verify lecture exists
-    const lecture = await Lecture.findById(lectureId);
-    if (!lecture) {
-      return res.status(404).json({ error: 'Lecture not found' });
+    if (!rawTranscript || !rawTranscript.trim()) {
+      return res.status(400).json({ error: 'rawTranscript is required' });
     }
 
+    // Create and save the transcript
     const transcript = new Transcript({
       userId,
-      lectureId,
-      subjectId,
-      text: text || '',
-      studyDate: new Date(studyDate),
+      subject: subject.trim(),
+      rawTranscript: rawTranscript.trim(),
+      summary: '',
+      transcribedAt: new Date(),
     });
 
     const savedTranscript = await transcript.save();
+
+    // Automatically generate summary after saving (non-blocking)
+    // This runs in the background without delaying the response
+    generateSummary(rawTranscript.trim())
+      .then(async (summary) => {
+        try {
+          // Update transcript with generated summary
+          await Transcript.findByIdAndUpdate(
+            savedTranscript._id,
+            { summary },
+            { new: true }
+          );
+          console.log(`[SUMMARY] Successfully generated summary for transcript ${savedTranscript._id}`);
+        } catch (updateError) {
+          console.error(`[SUMMARY] Failed to update transcript ${savedTranscript._id} with summary:`, updateError.message);
+        }
+      })
+      .catch((summaryError) => {
+        // Summarization failed, but transcript was already saved successfully
+        console.warn(`[SUMMARY] Failed to generate summary for transcript ${savedTranscript._id}: ${summaryError.message}`);
+        // Do not throw - allow the user's transcript to be saved even if summarization fails
+      });
+
+    // Return the saved transcript immediately (summary will be populated asynchronously)
     res.status(201).json(savedTranscript);
   } catch (error) {
     console.error('Error creating transcript:', error);
@@ -46,21 +79,14 @@ export const createTranscript = async (req, res) => {
 export const getTranscripts = async (req, res) => {
   try {
     const userId = req.userId;
-    const { lectureId } = req.query;
 
     if (!userId) {
       return res.status(401).json({ error: 'User not authenticated' });
     }
 
-    let query = { userId };
-    if (lectureId) {
-      query.lectureId = lectureId;
-    }
-
-    const transcripts = await Transcript.find(query)
-      .populate('lectureId')
-      .populate('subjectId')
-      .sort({ createdAt: -1 });
+    // Get all transcripts for the user, sorted by most recent first
+    const transcripts = await Transcript.find({ userId })
+      .sort({ transcribedAt: -1 });
 
     res.json(transcripts);
   } catch (error) {
@@ -78,9 +104,7 @@ export const getTranscriptById = async (req, res) => {
       return res.status(401).json({ error: 'User not authenticated' });
     }
 
-    const transcript = await Transcript.findOne({ _id: transcriptId, userId })
-      .populate('lectureId')
-      .populate('subjectId');
+    const transcript = await Transcript.findOne({ _id: transcriptId, userId });
 
     if (!transcript) {
       return res.status(404).json({ error: 'Transcript not found' });
@@ -93,25 +117,39 @@ export const getTranscriptById = async (req, res) => {
   }
 };
 
+/**
+ * Update transcript fields (rawTranscript and/or summary)
+ * Used when a user manually edits a transcript or its summary
+ */
 export const updateTranscriptText = async (req, res) => {
   try {
     const { transcriptId } = req.params;
-    const { text } = req.body;
+    const { rawTranscript, summary } = req.body;
     const userId = req.userId;
 
     if (!userId) {
       return res.status(401).json({ error: 'User not authenticated' });
     }
 
-    if (text === undefined) {
-      return res.status(400).json({ error: 'Text is required' });
+    // At least one field must be provided for update
+    if (rawTranscript === undefined && summary === undefined) {
+      return res.status(400).json({ error: 'At least one field (rawTranscript or summary) must be provided' });
+    }
+
+    // Build update object with only provided fields
+    const updateData = {};
+    if (rawTranscript !== undefined) {
+      updateData.rawTranscript = rawTranscript.trim();
+    }
+    if (summary !== undefined) {
+      updateData.summary = summary.trim();
     }
 
     const transcript = await Transcript.findOneAndUpdate(
       { _id: transcriptId, userId },
-      { text },
+      updateData,
       { new: true }
-    ).populate('lectureId').populate('subjectId');
+    );
 
     if (!transcript) {
       return res.status(404).json({ error: 'Transcript not found' });
@@ -138,9 +176,8 @@ export const deleteTranscript = async (req, res) => {
       return res.status(404).json({ error: 'Transcript not found' });
     }
 
-    // Cascade delete: Remove associated KeywordGroup, Summary
+    // Cascade delete: Remove associated KeywordGroup
     await KeywordGroup.deleteMany({ transcriptId });
-    await Summary.deleteMany({ transcriptId });
 
     res.json({ message: 'Transcript and related data deleted successfully' });
   } catch (error) {
