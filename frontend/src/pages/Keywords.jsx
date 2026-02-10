@@ -54,9 +54,21 @@ const Keywords = () => {
     const loadKeywords = async () => {
       if (!selectedTranscript || !token) return;
       try {
+        console.log('[KEYWORDS] Loading keywords for transcript:', selectedTranscript);
         const transcriptObj = transcripts.find(t => t._id === selectedTranscript);
-        if (transcriptObj && transcriptObj.sessionId) {
+        
+        if (!transcriptObj) {
+          console.warn('[KEYWORDS] Transcript not found:', selectedTranscript);
+          setKeywordGroups([]);
+          return;
+        }
+
+        console.log('[KEYWORDS] Transcript object:', { _id: transcriptObj._id, sessionId: transcriptObj.sessionId });
+
+        if (transcriptObj.sessionId) {
+          console.log('[KEYWORDS] Fetching keywords by sessionId:', transcriptObj.sessionId);
           const kws = await getKeywordsBySession(token, transcriptObj.sessionId);
+          console.log('[KEYWORDS] Fetched keywords:', kws.length, 'keywords');
           setKeywordGroups([
             {
               _id: transcriptObj.sessionId,
@@ -65,7 +77,9 @@ const Keywords = () => {
             },
           ]);
         } else {
+          console.log('[KEYWORDS] No sessionId, trying getKeywordGroupsByTranscript');
           const data = await getKeywordGroupsByTranscript(token, selectedTranscript);
+          console.log('[KEYWORDS] Fetched keyword groups:', data.length);
           setKeywordGroups(data);
         }
       } catch (err) {
@@ -270,9 +284,14 @@ const Keywords = () => {
             </h3>
 
             {filteredKeywords.length === 0 ? (
-              <p style={{ color: '#9ca3af' }}>
-                {searchTerm ? 'No keywords found' : 'No keywords for this transcript'}
-              </p>
+              <div style={{ padding: '2rem', textAlign: 'center', background: '#f3f4f6', borderRadius: '0.75rem', border: '1px solid #e5e7eb' }}>
+                <p style={{ color: '#9ca3af', marginBottom: '1rem' }}>
+                  {searchTerm ? 'No keywords found' : 'No keywords for this transcript yet'}
+                </p>
+                <p style={{ color: '#9ca3af', fontSize: '0.875rem' }}>
+                  {!searchTerm && 'Keywords will appear here after you save a transcript or manually add them below.'}
+                </p>
+              </div>
             ) : (
               <div style={{ display: 'grid', gap: '1rem' }}>
                 {filteredKeywords.map(keyword => (

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FileText, Trash2, Calendar, Eye, Edit2, Save, X } from 'lucide-react';
 import { Button } from '../components/ui/button';
@@ -33,6 +33,12 @@ const Transcripts = () => {
   const [editingText, setEditingText] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
+  // Debug state changes
+  useEffect(() => {
+    console.log('[DEBUG] isDialogOpen changed:', isDialogOpen);
+    console.log('[DEBUG] selectedTranscript:', selectedTranscript?._id || 'null');
+  }, [isDialogOpen, selectedTranscript]);
+
   // Load transcripts on mount
   useEffect(() => {
     const loadData = async () => {
@@ -65,10 +71,17 @@ const Transcripts = () => {
     }
   };
 
-  const viewTranscript = (transcript) => {
+  const viewTranscript = useCallback((transcript) => {
+    if (!transcript || !transcript._id) {
+      console.error('[ERROR] viewTranscript called with invalid transcript:', transcript);
+      setError('Invalid transcript data');
+      return;
+    }
+    console.log('[DEBUG] viewTranscript called with transcript:', transcript._id);
+    console.log('[DEBUG] Transcript data:', { subject: transcript.subject, hasRawTranscript: !!transcript.rawTranscript });
     setSelectedTranscript(transcript);
     setIsDialogOpen(true);
-  };
+  }, []);
 
   const startEdit = (field, currentText) => {
     setEditingField(field);
@@ -116,8 +129,13 @@ const Transcripts = () => {
 
   return (
     <div style={{ width: '100%', maxWidth: '1200px', margin: '0 auto', padding: '2rem' }}>
-      <h1 className="card__title">Learning Materials</h1>
-      <p className="card__subtitle">Access your transcripts and auto-generated summaries</p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+        <div>
+          <h1 className="card__title">Learning Materials</h1>
+          <p className="card__subtitle">Access your transcripts and auto-generated summaries</p>
+        </div>
+        <Button onClick={() => { console.log('[TEST] Dialog test button clicked'); setSelectedTranscript(transcripts[0]); setIsDialogOpen(true); }} size="sm">Test Dialog</Button>
+      </div>
 
       {error && (
         <Alert variant="destructive" style={{ marginBottom: '1rem' }}>
@@ -206,16 +224,23 @@ const Transcripts = () => {
       )}
 
       {/* View & Edit Transcript Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <Dialog open={isDialogOpen} onOpenChange={(newOpen) => {
+        console.log('[DEBUG] Dialog onOpenChange called with:', newOpen);
+        setIsDialogOpen(newOpen);
+      }}>
         <DialogContent style={{ maxWidth: '900px', maxHeight: '80vh', overflowY: 'auto' }}>
           <DialogHeader>
-            <DialogTitle>{selectedTranscript?.subject || 'Transcript'}</DialogTitle>
+            <DialogTitle>
+              {selectedTranscript?.subject ? `${selectedTranscript.subject} - View & Edit` : 'Transcript'}
+            </DialogTitle>
             <DialogDescription>
-              {selectedTranscript && new Date(selectedTranscript.transcribedAt).toLocaleDateString()}
+              {selectedTranscript && selectedTranscript.transcribedAt 
+                ? new Date(selectedTranscript.transcribedAt).toLocaleDateString() 
+                : 'No date'}
             </DialogDescription>
           </DialogHeader>
 
-          {selectedTranscript && (
+          {selectedTranscript ? (
             <div style={{ marginTop: '1rem', display: 'grid', gap: '2rem' }}>
               {/* Transcript Section */}
               <div>
@@ -334,6 +359,10 @@ const Transcripts = () => {
                   </div>
                 )}
               </div>
+            </div>
+          ) : (
+            <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>
+              <p>No transcript selected. Please click "View & Edit" to open a transcript.</p>
             </div>
           )}
         </DialogContent>

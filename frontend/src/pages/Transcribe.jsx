@@ -5,7 +5,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Alert, AlertDescription } from '../components/ui/alert';
-import { createTranscript } from '../api/client';
+import { createTranscript, createKeywords } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 
 // Demo lecture data with keywords
@@ -399,8 +399,10 @@ const Transcribe = () => {
    * Save transcript workflow:
    * 1. Send edited transcript to backend
    * 2. Backend automatically generates summary using OpenAI API
-   * 3. Summary is stored in the transcript record
-   * 4. User is redirected to transcripts page
+   * 3. Backend creates StudySession linking transcript and summary
+   * 4. If keywords exist, save them to the database with sessionId
+   * 5. Summary is stored in the transcript record
+   * 6. User is redirected to transcripts page
    */
   const saveTranscript = async () => {
     setSaveError('');
@@ -419,11 +421,39 @@ const Transcribe = () => {
       setIsSaving(true);
 
       // Save transcript with edited content
-      // The backend will automatically trigger OpenAI summarization
+      // The backend will automatically trigger OpenAI summarization and create StudySession
       const transcriptData = await createTranscript(token, {
         subject: subject.trim(),
         rawTranscript: editedTranscript.trim(),
       });
+
+      console.log('[SAVE] Transcript created:', transcriptData._id);
+      console.log('[SAVE] Session ID:', transcriptData.sessionId);
+
+      // Save keywords ONLY after transcript is successfully created
+      // Keywords are persisted with the sessionId
+      if (keywords && keywords.length > 0) {
+        try {
+          console.log('[SAVE] Saving', keywords.length, 'keywords with sessionId:', transcriptData.sessionId);
+          const keywordData = keywords.map(kw => ({
+            keywordText: typeof kw === 'string' ? kw : kw.keywordText || kw.word,
+            definition: kw.definition || kw.explanation || '',
+            source: 'manual'
+          }));
+
+          const savedKeywords = await createKeywords(token, {
+            sessionId: transcriptData.sessionId,
+            keywords: keywordData
+          });
+          console.log('[SAVE] Keywords saved successfully:', savedKeywords.length);
+        } catch (keywordError) {
+          console.error('[SAVE] Error saving keywords:', keywordError);
+          // Don't fail the entire save if keywords fail - info the user but continue
+          setSaveError(`Transcript saved but keywords failed to save: ${keywordError?.payload?.error || keywordError?.message}`);
+        }
+      } else {
+        console.log('[SAVE] No keywords to save');
+      }
 
       // Clear form
       setRawTranscript('');
