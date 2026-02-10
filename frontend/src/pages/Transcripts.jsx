@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { FileText, Trash2, Calendar, Eye, Edit2, Save, X } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Alert, AlertDescription } from '../components/ui/alert';
@@ -18,6 +19,7 @@ import { useAuth } from '../context/AuthContext';
 
 const Transcripts = () => {
   const { token } = useAuth();
+  const navigate = useNavigate();
 
   // Transcripts state
   const [transcripts, setTranscripts] = useState([]);
@@ -131,7 +133,7 @@ const Transcripts = () => {
           <p style={{ color: '#9ca3af', marginBottom: '1.5rem' }}>
             Start transcribing your first lecture to see it here
           </p>
-          <Button className="btn btn--primary" onClick={() => window.location.href = '/transcribe'}>
+          <Button className="btn btn--primary" onClick={() => navigate('/transcribe')}>
             Start Transcribing
           </Button>
         </div>
