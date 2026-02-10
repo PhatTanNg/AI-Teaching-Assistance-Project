@@ -50,6 +50,8 @@ function Button({
     <Comp
       data-slot="button"
       className={cn(buttonVariants({ variant, size, className }))}
+      // Ensure button does not act as a form submit by default
+      {...(Comp === "button" ? { type: (props as any).type ?? "button" } : {})}
       {...props}
     />
   );
