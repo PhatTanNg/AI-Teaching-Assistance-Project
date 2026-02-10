@@ -26,6 +26,15 @@ app.use(cors({
   ],
   credentials: true
 }));
+// Allow local dev frontend during development
+if (process.env.NODE_ENV !== 'production') {
+  app.use(cors({ origin: ['http://localhost:5173'], credentials: true }));
+}
+// Ensure Authorization header is accepted
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  next();
+});
 app.use(cookieParser());
 app.use(express.json());
 

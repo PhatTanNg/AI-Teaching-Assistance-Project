@@ -16,6 +16,8 @@ import {
   getSummaryByTranscript,
   updateSummaryText,
   deleteSummary,
+  createKeywords,
+  getKeywordsBySession,
 } from '../controllers/contentController.js';
 
 const router = express.Router();
@@ -73,5 +75,9 @@ router.put('/summaries/:summaryId', updateSummaryText);
 
 // Delete summary
 router.delete('/summaries/:summaryId', deleteSummary);
+
+// ------------------- KEYWORD LIST (by session) -------------------
+router.post('/keywords', createKeywords);
+router.get('/keywords', getKeywordsBySession);
 
 export default router;

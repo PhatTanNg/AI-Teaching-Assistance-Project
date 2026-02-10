@@ -7,11 +7,16 @@ const keywordGroupSchema = new mongoose.Schema(
       ref: 'Transcript',
       required: true,
     },
-    lectureId: {
+    sessionId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'Lecture',
-      required: true,
+      ref: 'StudySession',
+      index: true,
     },
+      // lectureId is optional: background tasks may not have a lecture context
+      lectureId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Lecture',
+      },
     studyDate: {
       type: Date,
       required: true,

@@ -75,10 +75,12 @@ export const signIn = async (req, res) => {
     });
 
     //give refresh token in http only cookie
+    // Set cookie security options depending on environment
+    const isProd = process.env.NODE_ENV === 'production';
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
-      secure: true,
-      sameSite: 'none',
+      secure: isProd,
+      sameSite: isProd ? 'none' : 'lax',
       maxAge: REFRESH_TOKE_TTL,
     });
     //give access token in response body

@@ -12,6 +12,11 @@ const keywordSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    sessionId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'StudySession',
+      index: true,
+    },
   },
   { timestamps: true }
 );

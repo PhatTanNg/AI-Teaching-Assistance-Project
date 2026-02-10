@@ -3,6 +3,7 @@ import KeywordGroup from '../models/KeywordGroup.js';
 import Keyword from '../models/Keyword.js';
 import Summary from '../models/Summary.js';
 import Lecture from '../models/Lecture.js';
+import StudySession from '../models/StudySession.js';
 import { generateSummary } from '../services/summaryService.js';
 
 // ==================== TRANSCRIPT CONTROLLERS ====================
@@ -46,30 +47,104 @@ export const createTranscript = async (req, res) => {
 
     const savedTranscript = await transcript.save();
 
-    // Automatically generate summary after saving (non-blocking)
-    // This runs in the background without delaying the response
-    generateSummary(rawTranscript.trim())
-      .then(async (summary) => {
-        try {
-          // Update transcript with generated summary
-          await Transcript.findByIdAndUpdate(
-            savedTranscript._id,
-            { summary },
-            { new: true }
-          );
-          console.log(`[SUMMARY] Successfully generated summary for transcript ${savedTranscript._id}`);
-        } catch (updateError) {
-          console.error(`[SUMMARY] Failed to update transcript ${savedTranscript._id} with summary:`, updateError.message);
-        }
-      })
-      .catch((summaryError) => {
-        // Summarization failed, but transcript was already saved successfully
-        console.warn(`[SUMMARY] Failed to generate summary for transcript ${savedTranscript._id}: ${summaryError.message}`);
-        // Do not throw - allow the user's transcript to be saved even if summarization fails
-      });
+    // Create a study session to group transcript, summary and keywords
+    const session = await StudySession.create({
+      userId,
+      transcriptId: savedTranscript._id,
+      meta: { subject: subject.trim() },
+    });
 
-    // Return the saved transcript immediately (summary will be populated asynchronously)
-    res.status(201).json(savedTranscript);
+    // link session to transcript
+    await Transcript.findByIdAndUpdate(savedTranscript._id, { sessionId: session._id });
+
+    // Background tasks: generate summary, create Summary doc, extract keywords and create groups
+    (async () => {
+      try {
+        // Summarize
+        const summaryText = await generateSummary(rawTranscript.trim()).catch((e) => {
+          console.warn('[SUMMARY] generation failed:', e?.message || e);
+          return '';
+        });
+
+        if (summaryText) {
+          try {
+            // Update transcript summary
+            await Transcript.findByIdAndUpdate(savedTranscript._id, { summary: summaryText });
+
+            // Create Summary document (lectureId/subjectId may be unknown at this time)
+            const summaryDoc = await Summary.create({
+              transcriptId: savedTranscript._id,
+              text: summaryText,
+              sessionId: session._id,
+            });
+
+            // Link summary into session
+            session.summaryId = summaryDoc._id;
+            await session.save();
+
+            console.log(`[SUMMARY] Created Summary ${summaryDoc._id} for transcript ${savedTranscript._id}`);
+          } catch (e) {
+            console.error('[SUMMARY] Failed to save Summary document:', e?.message || e);
+          }
+        }
+
+        // Basic keyword extraction (simple frequency-based stub)
+        try {
+          const extractKeywords = (text, max = 12) => {
+            if (!text) return [];
+            const stopwords = new Set(['the','and','is','in','to','of','a','for','on','with','that','this','as','are','it','by','an']);
+            const words = text
+              .toLowerCase()
+              .replace(/[^a-z0-9\s]/g, ' ')
+              .split(/\s+/)
+              .filter(w => w.length > 2 && !stopwords.has(w));
+            const freq = {};
+            for (const w of words) freq[w] = (freq[w] || 0) + 1;
+            return Object.entries(freq)
+              .sort((a,b) => b[1]-a[1])
+              .slice(0, max)
+              .map(([keyword]) => ({ keywordText: keyword, definition: '' }));
+          };
+
+          const keywords = extractKeywords(summaryText || rawTranscript.trim(), 10);
+
+          const createdKeywordIds = [];
+          for (const kw of keywords) {
+            const k = await Keyword.create({ keywordText: kw.keywordText, definition: kw.definition || '', sessionId: session._id });
+            createdKeywordIds.push(k._id);
+          }
+
+          // Create a keyword group for this transcript if keywords exist
+          if (createdKeywordIds.length > 0) {
+            // Only include lectureId if available in session meta
+            const groupData = {
+              transcriptId: savedTranscript._id,
+              sessionId: session._id,
+              studyDate: new Date(),
+              keywords: createdKeywordIds,
+            };
+            if (session?.meta && session.meta.lectureId) groupData.lectureId = session.meta.lectureId;
+
+            const group = await KeywordGroup.create(groupData);
+
+            session.keywordIds = createdKeywordIds;
+            session.keywordGroupIds = [group._id];
+            await session.save();
+
+            console.log(`[KEYWORDS] Created ${createdKeywordIds.length} keywords and group ${group._id} for transcript ${savedTranscript._id}`);
+          } else {
+            console.log(`[KEYWORDS] No keywords extracted for transcript ${savedTranscript._id}`);
+          }
+        } catch (kwErr) {
+          console.error('[KEYWORDS] Keyword extraction/storage failed:', kwErr?.message || kwErr);
+        }
+      } catch (bgErr) {
+        console.error('[BACKGROUND] Error in background tasks for transcript:', bgErr?.message || bgErr);
+      }
+    })();
+
+    // Return the saved transcript immediately (background tasks run asynchronously)
+    res.status(201).json({ ...savedTranscript.toObject(), sessionId: session._id });
   } catch (error) {
     console.error('Error creating transcript:', error);
     res.status(500).json({ error: 'Failed to create transcript', details: error.message });
@@ -253,6 +328,42 @@ export const getKeywordGroupsByTranscript = async (req, res) => {
       error: 'Failed to fetch keyword groups',
       details: error.message,
     });
+  }
+};
+
+// ------------------ NEW: Keyword list by session ------------------
+export const createKeywords = async (req, res) => {
+  try {
+    const { sessionId, keywords } = req.body;
+    const userId = req.userId;
+
+    if (!userId) return res.status(401).json({ error: 'User not authenticated' });
+    if (!sessionId || !Array.isArray(keywords)) return res.status(400).json({ error: 'sessionId and keywords array required' });
+
+    const created = [];
+    for (const kw of keywords) {
+      if (!kw.keywordText) continue;
+      const k = await Keyword.create({ keywordText: kw.keywordText.trim(), definition: kw.definition || '', sessionId });
+      created.push(k);
+    }
+
+    res.status(201).json(created);
+  } catch (err) {
+    console.error('Error creating keywords:', err);
+    res.status(500).json({ error: 'Failed to create keywords', details: err.message });
+  }
+};
+
+export const getKeywordsBySession = async (req, res) => {
+  try {
+    const { sessionId } = req.query;
+    if (!sessionId) return res.status(400).json({ error: 'sessionId query param required' });
+
+    const keywords = await Keyword.find({ sessionId }).sort({ createdAt: -1 });
+    res.json(keywords);
+  } catch (err) {
+    console.error('Error fetching keywords by session:', err);
+    res.status(500).json({ error: 'Failed to fetch keywords', details: err.message });
   }
 };
 

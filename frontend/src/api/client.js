@@ -3,8 +3,12 @@ const baseUrl = import.meta.env.VITE_API_BASE_URL ?? defaultBaseUrl;
 
 export const apiClient = async (endpoint, { method = 'GET', data, token } = {}) => {
   const headers = new Headers({ 'Content-Type': 'application/json' });
-  if (token) {
-    headers.append('Authorization', `Bearer ${token}`);
+
+  // fallback to stored token if not provided
+  const AUTH_TOKEN_KEY = 'aita_access_token';
+  const effectiveToken = token || (typeof window !== 'undefined' ? localStorage.getItem(AUTH_TOKEN_KEY) : null);
+  if (effectiveToken) {
+    headers.append('Authorization', `Bearer ${String(effectiveToken).trim()}`);
   }
 
   const response = await fetch(`${baseUrl}${endpoint}`, {
@@ -17,6 +21,16 @@ export const apiClient = async (endpoint, { method = 'GET', data, token } = {}) 
   const payload = await response.json().catch(() => ({}));
 
   if (!response.ok) {
+    // Clear invalid auth tokens for 401/403 to force re-login
+    if (response.status === 401 || response.status === 403) {
+      try {
+        localStorage.removeItem(AUTH_TOKEN_KEY);
+      } catch (e) {
+        // ignore
+      }
+      console.warn('[API] Authentication failed, cleared stored token');
+    }
+
     const error = new Error(payload.message ?? 'Request failed');
     error.status = response.status;
     error.payload = payload;
@@ -160,4 +174,16 @@ export const updateSummaryText = (token, summaryId, { text }) =>
 
 export const deleteSummary = (token, summaryId) =>
   apiClient(`/api/content/summaries/${summaryId}`, { method: 'DELETE', token });
+
+// ==================== KEYWORD LIST ENDPOINTS ====================
+
+export const createKeywords = (token, { sessionId, keywords }) =>
+  apiClient('/api/content/keywords', {
+    method: 'POST',
+    token,
+    data: { sessionId, keywords },
+  });
+
+export const getKeywordsBySession = (token, sessionId) =>
+  apiClient(`/api/content/keywords?sessionId=${sessionId}`, { method: 'GET', token });
 

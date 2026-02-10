@@ -23,6 +23,12 @@ const transcriptSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    // Reference to a study session that groups transcript, summary and keywords
+    sessionId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'StudySession',
+      index: true,
+    },
     // ISO timestamp indicating when the transcription was created
     transcribedAt: {
       type: Date,

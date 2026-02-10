@@ -11,12 +11,16 @@ const summarySchema = new mongoose.Schema(
     lectureId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Lecture',
-      required: true,
     },
     subjectId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Subject',
-      required: true,
+    },
+    // Link back to a study session (optional)
+    sessionId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'StudySession',
+      index: true,
     },
     text: {
       type: String,

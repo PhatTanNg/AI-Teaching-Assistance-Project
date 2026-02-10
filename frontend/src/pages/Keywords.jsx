@@ -7,6 +7,8 @@ import { Alert, AlertDescription } from '../components/ui/alert';
 import {
   getTranscripts,
   getKeywordGroupsByTranscript,
+  getKeywordsBySession,
+  createKeywords,
   updateKeywordDefinition,
   removeKeywordFromGroup,
   addKeywordToGroup,
@@ -52,8 +54,20 @@ const Keywords = () => {
     const loadKeywords = async () => {
       if (!selectedTranscript || !token) return;
       try {
-        const data = await getKeywordGroupsByTranscript(token, selectedTranscript);
-        setKeywordGroups(data);
+        const transcriptObj = transcripts.find(t => t._id === selectedTranscript);
+        if (transcriptObj && transcriptObj.sessionId) {
+          const kws = await getKeywordsBySession(token, transcriptObj.sessionId);
+          setKeywordGroups([
+            {
+              _id: transcriptObj.sessionId,
+              transcriptId: selectedTranscript,
+              keywords: kws,
+            },
+          ]);
+        } else {
+          const data = await getKeywordGroupsByTranscript(token, selectedTranscript);
+          setKeywordGroups(data);
+        }
       } catch (err) {
         console.error('Error loading keywords:', err);
         setError('Failed to load keywords');
@@ -61,7 +75,7 @@ const Keywords = () => {
     };
 
     loadKeywords();
-  }, [selectedTranscript, token]);
+  }, [selectedTranscript, token, transcripts]);
 
   const handleEditDefinition = (keywordId, currentDefinition) => {
     setEditingKeywordId(keywordId);
@@ -190,7 +204,7 @@ const Keywords = () => {
           <option value="">-- Select a transcript --</option>
           {transcripts.map(transcript => (
             <option key={transcript._id} value={transcript._id}>
-              {transcript.lectureId?.name} - {new Date(transcript.studyDate).toLocaleDateString()}
+              {transcript.subject} - {new Date(transcript.transcribedAt).toLocaleDateString()}
             </option>
           ))}
         </select>
