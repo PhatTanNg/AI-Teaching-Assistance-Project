@@ -301,6 +301,28 @@ const Transcribe = () => {
     }
   };
 
+  const handleTextareaDoubleClick = (event) => {
+    // Get the word where the double-click occurred
+    const text = editedTranscript;
+    const clickPosition = event.target.selectionStart;
+    
+    // Find word boundaries
+    let start = clickPosition;
+    let end = clickPosition;
+    
+    while (start > 0 && /\w/.test(text[start - 1])) {
+      start--;
+    }
+    while (end < text.length && /\w/.test(text[end])) {
+      end++;
+    }
+    
+    const word = text.substring(start, end).trim();
+    if (word) {
+      setSelectedText(word);
+    }
+  };
+
   const fetchKeywordDefinition = useCallback(async (word) => {
     try {
       const response = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(word)}`);
@@ -413,12 +435,15 @@ const Transcribe = () => {
     }
 
     if (!token) {
-      setSaveError('Not authenticated');
+      setSaveError('Not authenticated. Please log in again.');
+      setTimeout(() => navigate('/signin'), 2000);
       return;
     }
 
     try {
       setIsSaving(true);
+
+      console.log('[SAVE] Starting transcript save with token present:', !!token);
 
       // Save transcript with edited content
       // The backend will automatically trigger OpenAI summarization and create StudySession
@@ -436,9 +461,9 @@ const Transcribe = () => {
         try {
           console.log('[SAVE] Saving', keywords.length, 'keywords with sessionId:', transcriptData.sessionId);
           const keywordData = keywords.map(kw => ({
-            keywordText: typeof kw === 'string' ? kw : kw.keywordText || kw.word,
+            keywordText: typeof kw === 'string' ? kw : kw.keywordText || kw.word || kw.text,
             definition: kw.definition || kw.explanation || '',
-            source: 'manual'
+            source: kw.source || 'manual'
           }));
 
           const savedKeywords = await createKeywords(token, {
@@ -469,8 +494,16 @@ const Transcribe = () => {
       // Navigate to transcripts page
       navigate('/transcripts');
     } catch (error) {
-      console.error('Error saving transcript:', error);
-      setSaveError(error?.payload?.error || error?.message || 'Failed to save transcript');
+      console.error('[SAVE] Error saving transcript:', error);
+      const errorMsg = error?.payload?.error || error?.message || 'Failed to save transcript';
+      
+      // If auth error, offer re-login
+      if (error?.status === 401 || error?.status === 403 || errorMsg.includes('token') || errorMsg.includes('authenticated')) {
+        setSaveError(`Authentication error: ${errorMsg}. Please log in again.`);
+        setTimeout(() => navigate('/signin'), 2000);
+      } else {
+        setSaveError(errorMsg);
+      }
     } finally {
       setIsSaving(false);
     }
@@ -688,26 +721,79 @@ const Transcribe = () => {
                 )}
               </div>
             ) : (
-              // After stop: show editable textarea
+              // After stop: show editable textarea with keyword highlighting
               <div>
                 <Label style={{ marginBottom: '0.5rem', display: 'block' }}>Edit Transcript</Label>
+                <p style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.5rem' }}>💡 Double-click a word to add it as a keyword</p>
                 <textarea
                   value={editedTranscript}
                   onChange={(e) => setEditedTranscript(e.target.value)}
+                  onDoubleClick={handleTextareaDoubleClick}
                   style={{
                     width: '100%',
-                    minHeight: '400px',
+                    minHeight: '300px',
                     padding: '1rem',
                     border: '2px solid #93c5fd',
                     borderRadius: '0.75rem',
-                    fontFamily: 'monospace',
+                    fontFamily: 'inherit',
                     fontSize: '1rem',
                     lineHeight: '1.8',
-                    resize: 'both',
-                    fontFamily: 'inherit'
+                    resize: 'vertical',
                   }}
                   placeholder="Your transcript will appear here. You can edit it before saving."
                 />
+                
+                {/* Keyword highlighting preview */}
+                {editedTranscript && keywords.length > 0 && (
+                  <div
+                    style={{
+                      marginTop: '1rem',
+                      padding: '1rem',
+                      background: 'rgba(249, 250, 251, 0.8)',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '0.75rem',
+                      lineHeight: '1.8',
+                      fontSize: '0.95rem',
+                      minHeight: '100px',
+                      maxHeight: '200px',
+                      overflowY: 'auto'
+                    }}
+                  >
+                    <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.5rem', fontWeight: 600 }}>Keywords highlighted:</div>
+                    <div>
+                      {editedTranscript.split(/(?<=[.,!?])\s+/).filter(s => s.trim()).map((sentence, sentenceIndex) => {
+                        const cleanSentence = sentence.replace(/\|/g, '').trim();
+                        const highlightedParts = highlightSentence(cleanSentence);
+                        
+                        return (
+                          <div key={sentenceIndex} style={{ marginBottom: '0.25rem' }}>
+                            {Array.isArray(highlightedParts) ? (
+                              highlightedParts.map((part, partIndex) =>
+                                part.isKeyword ? (
+                                  <mark
+                                    key={`${part.text}-${sentenceIndex}-${partIndex}`}
+                                    style={{
+                                      background: part.keyword.source === 'ai' ? '#dbeafe' : '#fef3c7',
+                                      padding: '2px 4px',
+                                      borderRadius: '3px',
+                                      border: part.keyword.source === 'ai' ? '1px solid #93c5fd' : '1px solid #fde047'
+                                    }}
+                                  >
+                                    {part.text}
+                                  </mark>
+                                ) : (
+                                  <span key={`${sentenceIndex}-${partIndex}`}>{part.text}</span>
+                                )
+                              )
+                            ) : (
+                              <span>{cleanSentence}</span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

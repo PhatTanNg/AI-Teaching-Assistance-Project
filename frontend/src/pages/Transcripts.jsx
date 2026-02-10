@@ -228,7 +228,20 @@ const Transcripts = () => {
         console.log('[DEBUG] Dialog onOpenChange called with:', newOpen);
         setIsDialogOpen(newOpen);
       }}>
-        <DialogContent style={{ maxWidth: '900px', maxHeight: '80vh', overflowY: 'auto' }}>
+        <DialogContent style={{ 
+          maxWidth: '900px', 
+          maxHeight: '80vh', 
+          overflowY: 'auto',
+          position: 'fixed',
+          left: '50%',
+          top: '50%',
+          transform: 'translate(-50%, -50%)',
+          zIndex: 9999,
+          backgroundColor: 'white',
+          borderRadius: '8px',
+          boxShadow: '0 10px 40px rgba(0,0,0,0.2)',
+          padding: '24px'
+        }}>
           <DialogHeader>
             <DialogTitle>
               {selectedTranscript?.subject ? `${selectedTranscript.subject} - View & Edit` : 'Transcript'}
