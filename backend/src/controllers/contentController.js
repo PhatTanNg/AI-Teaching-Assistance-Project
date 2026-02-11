@@ -54,11 +54,15 @@ export const createTranscript = async (req, res) => {
       meta: { subject: subject.trim() },
     });
 
-    // Link session back to the transcript document and persist immediately
-    savedTranscript.sessionId = session._id;
-    await savedTranscript.save();
+    // Persist the session reference on the transcript and capture the updated doc
+    const updatedTranscript = await Transcript.findByIdAndUpdate(
+      savedTranscript._id,
+      { sessionId: session._id },
+      { new: true }
+    );
 
-    const transcriptResponse = savedTranscript.toObject();
+    const transcriptResponse = (updatedTranscript || savedTranscript).toObject();
+    transcriptResponse.sessionId = session._id;
 
     // Background tasks: generate summary, create Summary doc, extract keywords and create groups
     (async () => {
@@ -147,7 +151,7 @@ export const createTranscript = async (req, res) => {
     })();
 
     // Return the saved transcript immediately (background tasks run asynchronously)
-    res.status(201).json({ ...transcriptResponse, sessionId: session._id });
+    res.status(201).json(transcriptResponse);
   } catch (error) {
     console.error('Error creating transcript:', error);
     res.status(500).json({ error: 'Failed to create transcript', details: error.message });
