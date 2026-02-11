@@ -9,7 +9,9 @@ const keywordSchema = new mongoose.Schema(
     },
     definition: {
       type: String,
-      required: true,
+      // definition is optional; default to empty string so keywords can be created
+      // even when a definition wasn't provided by the client
+      default: '',
       trim: true,
     },
     sessionId: {

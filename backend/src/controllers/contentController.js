@@ -340,10 +340,125 @@ export const createKeywords = async (req, res) => {
     if (!userId) return res.status(401).json({ error: 'User not authenticated' });
     if (!sessionId || !Array.isArray(keywords)) return res.status(400).json({ error: 'sessionId and keywords array required' });
 
+    // Try to gather context (summary or raw transcript) to help OpenAI produce better definitions
+    let contextText = '';
+    try {
+      const session = await StudySession.findById(sessionId);
+      if (session?.transcriptId) {
+        const transcript = await Transcript.findById(session.transcriptId);
+        if (transcript) {
+          contextText = transcript.summary || transcript.rawTranscript || '';
+        }
+      }
+    } catch (ctxErr) {
+      console.warn('[KEYWORDS] Failed to load session/transcript context for definitions:', ctxErr?.message || ctxErr);
+    }
+
+    // Prepare list of keyword texts (unique, trimmed)
+    const keywordTexts = Array.from(new Set(keywords
+      .map(k => (typeof k === 'string' ? k : k.keywordText || k.word || k.text))
+      .filter(Boolean)
+      .map(s => s.toString().trim())
+    ));
+
+    // Helper: call OpenAI to generate definitions for a set of keywords using provided context
+    const generateDefinitions = async (words, context) => {
+      if (!words || words.length === 0) return {};
+      const apiKey = process.env.OPENAI_API_KEY;
+      if (!apiKey) return {};
+
+      const systemMsg = {
+        role: 'system',
+        content: 'You are a concise assistant that produces one-sentence definitions for technical or educational keywords. Return only valid JSON in the form [{"keyword":"...","definition":"..."}, ...] with no extra commentary.'
+      };
+
+      const userMsg = {
+        role: 'user',
+        content: `Provide a short (one-sentence) definition for each of the following keywords: ${JSON.stringify(words)}.\n\nContext: ${context ? context.substring(0, 4000) : 'none'}.\n\nReturn output as valid JSON array only.`
+      };
+
+      try {
+        const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model: 'gpt-3.5-turbo',
+            messages: [systemMsg, userMsg],
+            temperature: 0.2,
+            max_tokens: 500,
+          }),
+        });
+
+        if (!resp.ok) {
+          const errText = await resp.text().catch(() => '');
+          console.warn('[KEYWORDS] OpenAI definition request failed:', resp.status, errText);
+          return {};
+        }
+
+        const data = await resp.json().catch(() => ({}));
+        const content = data?.choices?.[0]?.message?.content;
+        if (!content) return {};
+
+        // Try to extract JSON from the model output (strip surrounding text if any)
+        let jsonText = content.trim();
+        // Find first '[' and last ']' to extract JSON array
+        const first = jsonText.indexOf('[');
+        const last = jsonText.lastIndexOf(']');
+        if (first !== -1 && last !== -1 && last > first) {
+          jsonText = jsonText.slice(first, last + 1);
+        }
+
+        const parsed = JSON.parse(jsonText);
+        const map = {};
+        for (const item of parsed) {
+          if (item && item.keyword) {
+            map[item.keyword.toString().trim().toLowerCase()] = (item.definition || '').toString().trim();
+          } else if (item && item.keywordText) {
+            map[item.keywordText.toString().trim().toLowerCase()] = (item.definition || '').toString().trim();
+          }
+        }
+        return map;
+      } catch (e) {
+        console.warn('[KEYWORDS] Error parsing OpenAI response for definitions:', e?.message || e);
+        return {};
+      }
+    };
+
+    // Generate definitions only for keywords that lack one
+    let generatedMap = {};
+    try {
+      // Determine which words actually need a generated definition
+      const needGen = [];
+      for (const t of keywordTexts) {
+        const provided = keywords.find(k => ((typeof k === 'string' ? k : k.keywordText) || '').toString().trim().toLowerCase() === t.toLowerCase());
+        if (!provided) continue;
+        const def = typeof provided === 'string' ? '' : (provided.definition || provided.explanation || '');
+        if (!def || def.trim().length === 0) {
+          needGen.push(t);
+        }
+      }
+
+      if (needGen.length > 0) {
+        generatedMap = await generateDefinitions(needGen, contextText);
+      }
+    } catch (genErr) {
+      console.warn('[KEYWORDS] Definition generation failed:', genErr?.message || genErr);
+      generatedMap = {};
+    }
+
     const created = [];
     for (const kw of keywords) {
-      if (!kw.keywordText) continue;
-      const k = await Keyword.create({ keywordText: kw.keywordText.trim(), definition: kw.definition || '', sessionId });
+      const text = (typeof kw === 'string' ? kw : kw.keywordText || kw.word || kw.text || '').toString().trim();
+      if (!text) continue;
+      const providedDef = typeof kw === 'string' ? '' : (kw.definition || kw.explanation || '');
+      const def = providedDef && providedDef.toString().trim().length > 0
+        ? providedDef.toString().trim()
+        : (generatedMap[text.toLowerCase()] || '');
+
+      const k = await Keyword.create({ keywordText: text, definition: def, sessionId });
       created.push(k);
     }
 
