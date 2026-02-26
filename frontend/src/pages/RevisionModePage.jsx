@@ -3,25 +3,14 @@ import TranscriptSelector from '../components/revision/TranscriptSelector.jsx';
 import FlashcardReview from '../components/revision/FlashcardReview.jsx';
 import McqQuiz from '../components/revision/McqQuiz.jsx';
 import ProgressDashboard from '../components/revision/ProgressDashboard.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
 
 const apiBase = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5001';
 const tokenKey = 'aita_access_token';
-const userKey = 'aita_user';
 
 const getToken = () => {
   try {
     return localStorage.getItem(tokenKey) || '';
-  } catch {
-    return '';
-  }
-};
-
-const getStudentId = () => {
-  try {
-    const raw = localStorage.getItem(userKey);
-    if (!raw) return '';
-    const parsed = JSON.parse(raw);
-    return parsed?._id || parsed?.id || '';
   } catch {
     return '';
   }
@@ -46,6 +35,7 @@ const apiRequest = async (path, { method = 'GET', body } = {}) => {
 };
 
 export default function RevisionModePage() {
+  const { user } = useAuth();
   const [transcripts, setTranscripts] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
   const [difficulty, setDifficulty] = useState('medium');
@@ -57,7 +47,7 @@ export default function RevisionModePage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const studentId = useMemo(() => getStudentId(), []);
+  const studentId = useMemo(() => user?._id || user?.id || '', [user]);
 
   const loadTranscripts = async () => {
     const payload = await apiRequest('/api/content/transcripts');
@@ -92,6 +82,10 @@ export default function RevisionModePage() {
     try {
       setError('');
       setIsLoading(true);
+      if (!studentId) {
+        setError('Session expired. Please sign in again.');
+        return;
+      }
       const payload = await apiRequest('/revision/flashcards/generate', {
         method: 'POST',
         body: {
@@ -114,6 +108,10 @@ export default function RevisionModePage() {
     try {
       setError('');
       setIsLoading(true);
+      if (!studentId) {
+        setError('Session expired. Please sign in again.');
+        return;
+      }
       const payload = await apiRequest('/revision/mcq/generate', {
         method: 'POST',
         body: {
@@ -133,6 +131,9 @@ export default function RevisionModePage() {
   };
 
   const rateFlashcard = async (flashcardId, rating) => {
+    if (!studentId) {
+      throw new Error('Session expired. Please sign in again.');
+    }
     const payload = await apiRequest('/revision/flashcard/rate', {
       method: 'POST',
       body: {
@@ -146,6 +147,9 @@ export default function RevisionModePage() {
   };
 
   const submitMcqAnswers = async (answers) => {
+    if (!studentId) {
+      throw new Error('Session expired. Please sign in again.');
+    }
     const payload = await apiRequest('/revision/mcq/submit', {
       method: 'POST',
       body: {
