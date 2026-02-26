@@ -7,6 +7,7 @@ import SignUp from './pages/SignUp.jsx';
 import Transcribe from './pages/Transcribe.jsx';
 import Transcripts from './pages/Transcripts.jsx';
 import Keywords from './pages/Keywords.jsx';
+import RevisionModePage from './pages/RevisionModePage.jsx';
 
 export default function App() {
   return (
@@ -27,6 +28,7 @@ export default function App() {
               <Route path="/transcribe" element={<Transcribe />} />
               <Route path="/transcripts" element={<Transcripts />} />
               <Route path="/keywords" element={<Keywords />} />
+              <Route path="/revision" element={<RevisionModePage />} />
             </Route>
             {/* Catch-all: redirect unknown routes to home (or change to a NotFound page) */}
             <Route path="*" element={<Navigate to="/" replace />} />

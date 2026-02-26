@@ -40,9 +40,15 @@ python app.py
 ```bash
 cd frontend
 npm install
-# optional: create .env and set VITE_API_BASE_URL if the API is not on http://localhost:5001
+# For local development, create .env.local to override API URL safely (ignored by git)
+echo VITE_API_BASE_URL=http://localhost:5001 > .env.local
 npm run dev
 ```
+
+### Frontend Environment Strategy
+- `frontend/.env`: shared/default value (used by deploy/build pipelines)
+- `frontend/.env.local`: machine-specific override for local development (git-ignored)
+- Vite automatically prioritizes `.env.local` over `.env`
 
 ### One-Command Startup (Windows)
 ```powershell
@@ -56,6 +62,7 @@ Access the UI at `http://localhost:5173`.
 2. Watch transcripts update in real time while AI-generated keywords populate the sidebar.
 3. Hover over keywords for definitions, or add/remove keywords manually from highlighted text.
 4. Save transcripts for later review; saved transcripts and keywords are stored in browser `localStorage`.
+5. Open **Revision Mode** (`/revision`) to generate flashcards/MCQs from saved transcripts and view progress.
 
 ## Testing
 - Python keyword service smoke test: `python test_backend.py`

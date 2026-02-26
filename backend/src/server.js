@@ -8,6 +8,7 @@ import userRoute from "./routes/userRoute.js";
 import transcribeRoute from "./routes/transcribeRoute.js";
 import subjectRoute from "./routes/subjectRoute.js";
 import contentRoute from "./routes/contentRoute.js";
+import revisionRouter from "./revision/routes/revisionRouter.js";
 import { protectedRoute } from "./middlewares/authMiddleware.js";
 import http from 'http';
 import WebSocket, { WebSocketServer } from 'ws';
@@ -21,15 +22,12 @@ const PORT = process.env.PORT || 5001;
 //middleware
 app.use(cors({
   origin: [
+    'http://localhost:5173',
     'https://ai-teaching-assistance-project.vercel.app',
     'https://ai-teaching-assistance-project.onrender.com'
   ],
   credentials: true
 }));
-// Allow local dev frontend during development
-if (process.env.NODE_ENV !== 'production') {
-  app.use(cors({ origin: ['http://localhost:5173'], credentials: true }));
-}
 // Ensure Authorization header is accepted
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
@@ -53,6 +51,7 @@ app.use("/api/transcribe", transcribeRoute);
 app.use("/api/users",protectedRoute , userRoute);
 app.use("/api/subjects", subjectRoute);
 app.use("/api/content", contentRoute);
+app.use('/revision', revisionRouter);
 
 // Proxy endpoint for keyword analysis (forwards to Python backend)
 app.post('/api/analyze', async (req, res) => {

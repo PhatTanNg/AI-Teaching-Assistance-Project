@@ -6,6 +6,7 @@ const authedLinks = [
   { to: '/transcribe', label: 'Transcribe' },
   { to: '/transcripts', label: 'Transcripts' },
   { to: '/keywords', label: 'Keywords' },
+  { to: '/revision', label: 'Revision Mode' },
 ];
 
 const unauthLinks = [
