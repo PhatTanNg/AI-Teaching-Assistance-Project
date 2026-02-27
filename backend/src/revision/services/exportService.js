@@ -31,8 +31,9 @@ const mcqQuestionSchema = new Schema(
     correct: { type: String, enum: ['A', 'B', 'C', 'D'], required: true },
     explanation: { type: String, required: true },
     sourceRef: { type: String, default: '' },
+    difficulty: { type: String, enum: ['easy', 'medium', 'hard'], default: 'medium' },
   },
-  { timestamps: true, collection: 'mcq_questions' },
+  { timestamps: { createdAt: true, updatedAt: false }, collection: 'mcq_questions' },
 );
 
 const RevisionSet = mongoose.models.RevisionSet || mongoose.model('RevisionSet', revisionSetSchema);

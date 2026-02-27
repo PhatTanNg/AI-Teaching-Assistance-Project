@@ -31,9 +31,17 @@ const revisionSetSchema = new Schema(
 const mcqQuestionSchema = new Schema(
   {
     setId: { type: Schema.Types.ObjectId, required: true, index: true },
+    question: { type: String, required: true, trim: true },
+    optionA: { type: String, required: true, trim: true },
+    optionB: { type: String, required: true, trim: true },
+    optionC: { type: String, required: true, trim: true },
+    optionD: { type: String, required: true, trim: true },
+    correct: { type: String, enum: ['A', 'B', 'C', 'D'], required: true },
+    explanation: { type: String, required: true, trim: true },
     sourceRef: { type: String, default: '' },
+    difficulty: { type: String, enum: ['easy', 'medium', 'hard'], default: 'medium' },
   },
-  { timestamps: true, collection: 'mcq_questions' },
+  { timestamps: { createdAt: true, updatedAt: false }, collection: 'mcq_questions' },
 );
 
 const mcqAttemptSchema = new Schema(
