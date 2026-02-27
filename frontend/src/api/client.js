@@ -21,14 +21,14 @@ export const apiClient = async (endpoint, { method = 'GET', data, token } = {}) 
   const payload = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    // Clear invalid auth tokens for 401/403 to force re-login
-    if (response.status === 401 || response.status === 403) {
+    // Clear invalid auth tokens on 401 (expired/invalid) — NOT 403 (permission denied)
+    if (response.status === 401) {
       try {
         localStorage.removeItem(AUTH_TOKEN_KEY);
       } catch (e) {
         // ignore
       }
-      console.warn('[API] Authentication failed, cleared stored token');
+      console.warn('[API] Token invalid/expired (401), cleared stored token');
     }
 
     const error = new Error(payload.message ?? 'Request failed');

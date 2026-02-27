@@ -1,45 +1,8 @@
-import mongoose from 'mongoose';
-
-const { Schema } = mongoose;
-
-const revisionSetSchema = new Schema(
-  {
-    setType: { type: String, enum: ['flashcard', 'mcq'], required: true, index: true },
-    title: { type: String },
-  },
-  { timestamps: true, collection: 'revision_sets' },
-);
-
-const flashcardSchema = new Schema(
-  {
-    setId: { type: Schema.Types.ObjectId, required: true, index: true },
-    front: { type: String, required: true },
-    back: { type: String, required: true },
-    sourceRef: { type: String, default: '' },
-  },
-  { timestamps: true, collection: 'flashcards' },
-);
-
-const mcqQuestionSchema = new Schema(
-  {
-    setId: { type: Schema.Types.ObjectId, required: true, index: true },
-    question: { type: String, required: true },
-    optionA: { type: String, required: true },
-    optionB: { type: String, required: true },
-    optionC: { type: String, required: true },
-    optionD: { type: String, required: true },
-    correct: { type: String, enum: ['A', 'B', 'C', 'D'], required: true },
-    explanation: { type: String, required: true },
-    sourceRef: { type: String, default: '' },
-    difficulty: { type: String, enum: ['easy', 'medium', 'hard'], default: 'medium' },
-  },
-  { timestamps: { createdAt: true, updatedAt: false }, collection: 'mcq_questions' },
-);
-
-const RevisionSet = mongoose.models.RevisionSet || mongoose.model('RevisionSet', revisionSetSchema);
-const Flashcard = mongoose.models.Flashcard || mongoose.model('Flashcard', flashcardSchema);
-const McqQuestion =
-  mongoose.models.RevisionMcqQuestion || mongoose.model('RevisionMcqQuestion', mcqQuestionSchema);
+import {
+  RevisionSet,
+  Flashcard,
+  McqQuestion,
+} from '../models/revisionModels.js';
 
 const escapeCsv = (text) => `"${String(text || '').replace(/"/g, '""')}"`;
 

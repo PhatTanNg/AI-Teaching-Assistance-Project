@@ -40,11 +40,14 @@ export const AuthProvider = ({ children }) => {
       setUser(response.user);
     } catch (error) {
       console.error('Unable to fetch profile:', error);
-      setToken(null);
-      try {
-        localStorage.removeItem(AUTH_TOKEN_KEY);
-      } catch (storageError) {
-        console.warn('Unable to clear stored token:', storageError);
+      // Only clear auth state on 401 (invalid/expired token), not on network errors or 403
+      if (error.status === 401) {
+        setToken(null);
+        try {
+          localStorage.removeItem(AUTH_TOKEN_KEY);
+        } catch (storageError) {
+          console.warn('Unable to clear stored token:', storageError);
+        }
       }
     } finally {
       setIsLoading(false);

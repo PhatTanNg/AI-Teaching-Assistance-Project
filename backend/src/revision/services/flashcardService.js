@@ -1,47 +1,11 @@
 import mongoose from 'mongoose';
 import Transcript from '../../models/Transcript.js';
 import { buildFlashcardUserPrompt, flashcardSystemPrompt } from '../prompts/flashcardPrompt.js';
-
-const { Schema } = mongoose;
-
-const revisionSetSchema = new Schema(
-  {
-    studentId: { type: Schema.Types.ObjectId, required: true, index: true },
-    title: { type: String, trim: true },
-    setType: { type: String, enum: ['flashcard', 'mcq'], required: true, index: true },
-    difficulty: { type: String, enum: ['easy', 'medium', 'hard'], default: 'medium' },
-    totalCards: { type: Number, default: 0 },
-  },
-  { timestamps: true, collection: 'revision_sets' },
-);
-
-const revisionSetTranscriptSchema = new Schema(
-  {
-    setId: { type: Schema.Types.ObjectId, required: true, index: true },
-    transcriptId: { type: Schema.Types.ObjectId, required: true, index: true },
-  },
-  { timestamps: false, collection: 'revision_set_transcripts' },
-);
-
-revisionSetTranscriptSchema.index({ setId: 1, transcriptId: 1 }, { unique: true });
-
-const flashcardSchema = new Schema(
-  {
-    setId: { type: Schema.Types.ObjectId, required: true, index: true },
-    front: { type: String, required: true, trim: true },
-    back: { type: String, required: true, trim: true },
-    sourceRef: { type: String, default: '' },
-    srsBox: { type: Number, default: 1, min: 1, max: 5 },
-    nextReview: { type: Date, default: Date.now, index: true },
-    easeFactor: { type: Number, default: 2.5 },
-  },
-  { timestamps: { createdAt: true, updatedAt: false }, collection: 'flashcards' },
-);
-
-const RevisionSet = mongoose.models.RevisionSet || mongoose.model('RevisionSet', revisionSetSchema);
-const RevisionSetTranscript =
-  mongoose.models.RevisionSetTranscript || mongoose.model('RevisionSetTranscript', revisionSetTranscriptSchema);
-const Flashcard = mongoose.models.Flashcard || mongoose.model('Flashcard', flashcardSchema);
+import {
+  RevisionSet,
+  RevisionSetTranscript,
+  Flashcard,
+} from '../models/revisionModels.js';
 
 const tokenize = (text) =>
   String(text || '')

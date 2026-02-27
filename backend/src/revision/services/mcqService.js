@@ -1,65 +1,12 @@
 import mongoose from 'mongoose';
 import Transcript from '../../models/Transcript.js';
 import { buildMcqUserPrompt, mcqSystemPrompt } from '../prompts/mcqPrompt.js';
-
-const { Schema } = mongoose;
-
-const revisionSetSchema = new Schema(
-  {
-    studentId: { type: Schema.Types.ObjectId, required: true, index: true },
-    title: { type: String, trim: true },
-    setType: { type: String, enum: ['flashcard', 'mcq'], required: true, index: true },
-    difficulty: { type: String, enum: ['easy', 'medium', 'hard'], default: 'medium' },
-    totalCards: { type: Number, default: 0 },
-  },
-  { timestamps: true, collection: 'revision_sets' },
-);
-
-const revisionSetTranscriptSchema = new Schema(
-  {
-    setId: { type: Schema.Types.ObjectId, required: true, index: true },
-    transcriptId: { type: Schema.Types.ObjectId, required: true, index: true },
-  },
-  { timestamps: false, collection: 'revision_set_transcripts' },
-);
-
-revisionSetTranscriptSchema.index({ setId: 1, transcriptId: 1 }, { unique: true });
-
-const mcqQuestionSchema = new Schema(
-  {
-    setId: { type: Schema.Types.ObjectId, required: true, index: true },
-    question: { type: String, required: true, trim: true },
-    optionA: { type: String, required: true, trim: true },
-    optionB: { type: String, required: true, trim: true },
-    optionC: { type: String, required: true, trim: true },
-    optionD: { type: String, required: true, trim: true },
-    correct: { type: String, enum: ['A', 'B', 'C', 'D'], required: true },
-    explanation: { type: String, required: true, trim: true },
-    sourceRef: { type: String, default: '' },
-    difficulty: { type: String, enum: ['easy', 'medium', 'hard'], default: 'medium' },
-  },
-  { timestamps: { createdAt: true, updatedAt: false }, collection: 'mcq_questions' },
-);
-
-const mcqAttemptSchema = new Schema(
-  {
-    studentId: { type: Schema.Types.ObjectId, required: true, index: true },
-    questionId: { type: Schema.Types.ObjectId, required: true, index: true },
-    selected: { type: String, enum: ['A', 'B', 'C', 'D'] },
-    isCorrect: { type: Boolean },
-    timeTakenMs: { type: Number, default: 0 },
-    attemptedAt: { type: Date, default: Date.now, index: true },
-  },
-  { timestamps: false, collection: 'mcq_attempts' },
-);
-
-const RevisionSet = mongoose.models.RevisionSet || mongoose.model('RevisionSet', revisionSetSchema);
-const RevisionSetTranscript =
-  mongoose.models.RevisionSetTranscript || mongoose.model('RevisionSetTranscript', revisionSetTranscriptSchema);
-const McqQuestion =
-  mongoose.models.RevisionMcqQuestion || mongoose.model('RevisionMcqQuestion', mcqQuestionSchema);
-const McqAttempt =
-  mongoose.models.RevisionMcqAttempt || mongoose.model('RevisionMcqAttempt', mcqAttemptSchema);
+import {
+  RevisionSet,
+  RevisionSetTranscript,
+  McqQuestion,
+  McqAttempt,
+} from '../models/revisionModels.js';
 
 const tokenize = (text) =>
   String(text || '')
@@ -200,35 +147,47 @@ export const generateMcqSet = async ({
     { ordered: false },
   ).catch(() => {});
 
-  const created = await McqQuestion.insertMany(
-    trimmed.map((item) => ({
-      setId: setDoc._id,
-      question: item.question,
-      optionA: item.options.A,
-      optionB: item.options.B,
-      optionC: item.options.C,
-      optionD: item.options.D,
-      correct: item.correct,
-      explanation: item.explanation,
-      sourceRef: item.source_ref,
-      difficulty,
-    })),
-  );
+  const insertDocs = trimmed.map((item) => ({
+    setId: setDoc._id,
+    question: item.question,
+    optionA: item.options.A,
+    optionB: item.options.B,
+    optionC: item.options.C,
+    optionD: item.options.D,
+    correct: item.correct,
+    explanation: item.explanation,
+    sourceRef: item.source_ref,
+    difficulty,
+  }));
 
+  console.log('[REVISION][MCQ][PRE_INSERT] Sample doc:', JSON.stringify(insertDocs[0]));
+
+  const created = await McqQuestion.insertMany(insertDocs);
+
+  console.log('[REVISION][MCQ][POST_INSERT] Sample saved:', JSON.stringify({
+    _id: created[0]?._id,
+    question: created[0]?.question,
+    optionA: created[0]?.optionA,
+    correct: created[0]?.correct,
+  }));
+
+  // Build response from VALIDATED INPUT data + DB-generated IDs.
+  // This guarantees the response has content even if Mongoose model
+  // cached a stripped schema from a prior import.
   return {
     set_id: String(setDoc._id),
-    questions: created.map((question) => ({
-      id: String(question._id),
-      question: question.question,
+    questions: trimmed.map((item, i) => ({
+      id: String(created[i]?._id ?? ''),
+      question: item.question,
       options: {
-        A: question.optionA,
-        B: question.optionB,
-        C: question.optionC,
-        D: question.optionD,
+        A: item.options.A,
+        B: item.options.B,
+        C: item.options.C,
+        D: item.options.D,
       },
-      correct: question.correct,
-      explanation: question.explanation,
-      source_ref: question.sourceRef,
+      correct: item.correct,
+      explanation: item.explanation,
+      source_ref: item.source_ref,
     })),
   };
 };

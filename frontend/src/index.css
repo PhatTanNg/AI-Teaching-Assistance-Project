@@ -1820,22 +1820,41 @@ textarea.neon-textarea:focus {
 }
 
 /* Progress bar */
+.gen-progress-pct {
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--accent-cyan);
+  margin-bottom: 4px;
+  letter-spacing: 0.05em;
+}
+
 .gen-progress-track {
   position: relative;
-  height: 8px;
+  height: 10px;
   background: rgba(255, 255, 255, 0.06);
   border-radius: 999px;
-  overflow: hidden;
-  margin-top: 0.5rem;
+  margin: 0 0 0.25rem;
+  /* No overflow:hidden — allows glow to be visible */
 }
 
 .gen-progress-fill {
   position: absolute;
   left: 0; top: 0; bottom: 0;
-  background: linear-gradient(90deg, var(--accent-cyan), var(--accent-purple));
+  min-width: 6px;
+  background: linear-gradient(90deg, #6EE7F7 0%, #A78BFA 60%, #6EE7F7 100%);
+  background-size: 200% 100%;
   border-radius: 999px;
-  transition: width 0.4s ease;
-  box-shadow: 0 0 12px rgba(110, 231, 247, 0.5);
+  transition: width 0.3s ease;
+  box-shadow:
+    0 0 8px rgba(110, 231, 247, 0.8),
+    0 0 20px rgba(110, 231, 247, 0.4);
+  animation: genShimmer 2s linear infinite;
+}
+
+@keyframes genShimmer {
+  0%   { background-position: 200% center; }
+  100% { background-position: -200% center; }
 }
 
 .gen-progress-label {
@@ -1864,12 +1883,20 @@ textarea.neon-textarea:focus {
   gap: 0.75rem;
   padding: 0.625rem 0.875rem;
   border-radius: 0.625rem;
-  transition: background 0.3s ease;
+  border: 1px solid transparent;
+  transition: background 0.3s ease, border-color 0.3s ease, opacity 0.3s ease;
 }
 
-.gen-step--done    { background: rgba(74, 222, 128, 0.06); }
-.gen-step--active  { background: rgba(110, 231, 247, 0.08); }
-.gen-step--pending { opacity: 0.4; }
+.gen-step--done {
+  background: rgba(74, 222, 128, 0.06);
+}
+.gen-step--active {
+  background: rgba(110, 231, 247, 0.12);
+  border-color: rgba(110, 231, 247, 0.25);
+}
+.gen-step--pending {
+  opacity: 0.35;
+}
 
 .gen-step-icon { font-size: 1rem; min-width: 20px; text-align: center; }
 
@@ -1879,8 +1906,8 @@ textarea.neon-textarea:focus {
   font-family: var(--font-body);
 }
 
-.gen-step--done .gen-step-label   { color: var(--accent-green); }
-.gen-step--active .gen-step-label { color: var(--accent-cyan); font-weight: 500; }
+.gen-step--done .gen-step-label   { color: #4ADE80; }
+.gen-step--active .gen-step-label { color: #6EE7F7; font-weight: 600; }
 
 /* Tiny spinner for active step */
 .gen-spinner {

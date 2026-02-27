@@ -20,7 +20,7 @@ const protectedRoute = async (req, res, next) => {
         if (err) {
             console.error("[AUTH] Token verification failed:", err.message);
             try { console.log('[AUTH] Token (first 20 chars):', token.substring(0, 20) + '...'); } catch(e){}
-            return res.status(403).json({ message: "Invalid token" });
+            return res.status(401).json({ message: "Invalid token" });
         }
         //find user by id from token
         const user = await User.findById(decoded.userId).select('-password');

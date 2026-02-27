@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, forwardRef, useImperativeHandle } from 'react';
+import { useEffect, useState, useRef, forwardRef, useImperativeHandle, useCallback } from 'react';
 
 const STEPS = {
   mcq: [
@@ -27,54 +27,77 @@ const GenerationLoader = forwardRef(function GenerationLoader(
   const [activeStep, setActiveStep] = useState(0);
   const [progress, setProgress] = useState(0);
   const [done, setDone] = useState(false);
-  const timerRef = useRef(null);
-  const startRef = useRef(null);
+
+  // Refs to hold timer ids for cleanup
+  const progressIntervalRef = useRef(null);
+  const stepTimersRef = useRef([]);
+  const startTimeRef = useRef(null);
+
+  // Cleanup all timers
+  const clearAllTimers = useCallback(() => {
+    if (progressIntervalRef.current) {
+      clearInterval(progressIntervalRef.current);
+      progressIntervalRef.current = null;
+    }
+    stepTimersRef.current.forEach(clearTimeout);
+    stepTimersRef.current = [];
+  }, []);
 
   // Expose complete() to parent via ref
   useImperativeHandle(ref, () => ({
     complete() {
-      cancelAnimationFrame(timerRef.current);
+      clearAllTimers();
       setProgress(100);
       setActiveStep(steps.length);
       setDone(true);
       setTimeout(() => onComplete?.(), 600);
     },
-  }));
+  }), [steps.length, onComplete, clearAllTimers]);
 
   useEffect(() => {
     if (!isOpen) {
+      clearAllTimers();
       setActiveStep(0);
       setProgress(0);
       setDone(false);
       return;
     }
 
-    startRef.current = Date.now();
+    // Reset state on open
+    setActiveStep(0);
+    setProgress(0);
+    setDone(false);
 
-    const tick = () => {
-      const elapsed = Date.now() - startRef.current;
-      const raw = Math.min((elapsed / totalMs) * 100, 90); // cap at 90%
-      setProgress(raw);
+    startTimeRef.current = Date.now();
 
-      // Advance step pointer
-      let cumulative = 0;
-      for (let i = 0; i < steps.length; i++) {
-        cumulative += steps[i].ms;
-        if (elapsed < cumulative) {
-          setActiveStep(i);
-          break;
-        }
-        if (i === steps.length - 1) setActiveStep(i);
-      }
+    // Smooth progress bar — updates every 100ms, caps at 90%
+    progressIntervalRef.current = setInterval(() => {
+      const elapsed = Date.now() - startTimeRef.current;
+      const pct = Math.min((elapsed / totalMs) * 100, 90);
+      setProgress(pct);
+      if (pct >= 90) clearInterval(progressIntervalRef.current);
+    }, 100);
 
-      if (raw < 90) timerRef.current = requestAnimationFrame(tick);
-    };
+    // Step advancement — schedule each step transition at its cumulative time
+    let cumulative = 0;
+    stepTimersRef.current = steps.map((step, index) => {
+      cumulative += step.ms;
+      return setTimeout(() => {
+        setActiveStep(index + 1);
+      }, cumulative);
+    });
 
-    timerRef.current = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(timerRef.current);
-  }, [isOpen, totalMs, steps]);
+    return () => clearAllTimers();
+  }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!isOpen) return null;
+
+  const getStatus = (index) => {
+    if (done) return 'done';
+    if (index < activeStep) return 'done';
+    if (index === activeStep) return 'active';
+    return 'pending';
+  };
 
   return (
     <div className="gen-loader-overlay">
@@ -93,22 +116,20 @@ const GenerationLoader = forwardRef(function GenerationLoader(
         </div>
 
         {/* Progress bar */}
-        <div className="gen-progress-track">
-          <span className="gen-progress-label">{Math.round(progress)}%</span>
-          <div
-            className="gen-progress-fill"
-            style={{ width: `${progress}%` }}
-          />
+        <div>
+          <div className="gen-progress-pct">{Math.round(progress)}%</div>
+          <div className="gen-progress-track">
+            <div
+              className="gen-progress-fill"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
         </div>
 
         {/* Step list */}
         <ul className="gen-step-list">
           {steps.map((step, i) => {
-            const status =
-              done ? 'done' :
-              i < activeStep ? 'done' :
-              i === activeStep ? 'active' :
-              'pending';
+            const status = getStatus(i);
 
             return (
               <li key={step.id} className={`gen-step-item gen-step--${status}`}>

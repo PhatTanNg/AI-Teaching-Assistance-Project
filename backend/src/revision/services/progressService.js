@@ -1,68 +1,12 @@
 import mongoose from 'mongoose';
-
-const { Schema } = mongoose;
-
-const studentProgressSchema = new Schema(
-  {
-    studentId: { type: Schema.Types.ObjectId, required: true, unique: true, index: true },
-    totalFlashcards: { type: Number, default: 0 },
-    totalMcqsDone: { type: Number, default: 0 },
-    totalCorrect: { type: Number, default: 0 },
-    currentStreakDays: { type: Number, default: 0 },
-    xpPoints: { type: Number, default: 0 },
-    lastActiveDate: { type: Date },
-  },
-  { timestamps: true, collection: 'student_progress' },
-);
-
-studentProgressSchema.index({ updatedAt: -1 });
-
-const revisionSetSchema = new Schema(
-  {
-    studentId: { type: Schema.Types.ObjectId, required: true, index: true },
-    title: { type: String, trim: true },
-    setType: { type: String, enum: ['flashcard', 'mcq'], required: true, index: true },
-    difficulty: { type: String, enum: ['easy', 'medium', 'hard'], default: 'medium' },
-    totalCards: { type: Number, default: 0 },
-  },
-  { timestamps: true, collection: 'revision_sets' },
-);
-
-const mcqQuestionSchema = new Schema(
-  {
-    setId: { type: Schema.Types.ObjectId, required: true, index: true },
-    question: { type: String, required: true, trim: true },
-    optionA: { type: String, required: true, trim: true },
-    optionB: { type: String, required: true, trim: true },
-    optionC: { type: String, required: true, trim: true },
-    optionD: { type: String, required: true, trim: true },
-    correct: { type: String, enum: ['A', 'B', 'C', 'D'], required: true },
-    explanation: { type: String, required: true, trim: true },
-    sourceRef: { type: String, default: '' },
-    difficulty: { type: String, enum: ['easy', 'medium', 'hard'], default: 'medium' },
-  },
-  { timestamps: { createdAt: true, updatedAt: false }, collection: 'mcq_questions' },
-);
-
-const mcqAttemptSchema = new Schema(
-  {
-    studentId: { type: Schema.Types.ObjectId, required: true, index: true },
-    questionId: { type: Schema.Types.ObjectId, required: true, index: true },
-    selected: { type: String, enum: ['A', 'B', 'C', 'D'] },
-    isCorrect: { type: Boolean },
-    timeTakenMs: { type: Number, default: 0 },
-    attemptedAt: { type: Date, default: Date.now, index: true },
-  },
-  { timestamps: false, collection: 'mcq_attempts' },
-);
+import {
+  RevisionSet,
+  McqQuestion,
+  McqAttempt,
+  StudentProgress,
+} from '../models/revisionModels.js';
 
 const StudySession = mongoose.models.StudySession;
-
-const StudentProgress =
-  mongoose.models.StudentProgress || mongoose.model('StudentProgress', studentProgressSchema);
-const RevisionSet = mongoose.models.RevisionSet || mongoose.model('RevisionSet', revisionSetSchema);
-const McqQuestion = mongoose.models.RevisionMcqQuestion || mongoose.model('RevisionMcqQuestion', mcqQuestionSchema);
-const McqAttempt = mongoose.models.RevisionMcqAttempt || mongoose.model('RevisionMcqAttempt', mcqAttemptSchema);
 
 const startOfUtcDay = (date) => {
   const d = new Date(date);

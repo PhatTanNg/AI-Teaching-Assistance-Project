@@ -84,7 +84,7 @@ export default function RevisionModePage() {
 
   const generateMcqs = async () => {
     try {
-      setError(''); setIsLoading(true);
+      setError(''); setIsLoading(true); setLoaderType('mcq');
       if (!studentId) { setError('Session expired. Please sign in again.'); setLoaderType(null); return; }
       const payload = await apiRequest('/revision/mcq/generate', {
         method: 'POST', body: { student_id: studentId, transcript_ids: selectedIds, count, difficulty },
