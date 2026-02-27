@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import TranscriptSelector from '../components/revision/TranscriptSelector.jsx';
 import FlashcardReview from '../components/revision/FlashcardReview.jsx';
 import McqQuiz from '../components/revision/McqQuiz.jsx';
 import ProgressDashboard from '../components/revision/ProgressDashboard.jsx';
+import GenerationLoader from '../components/revision/GenerationLoader.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 
 const apiBase = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5001';
@@ -36,6 +37,8 @@ export default function RevisionModePage() {
   const [weakTopics, setWeakTopics] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [loaderType, setLoaderType] = useState(null); // 'mcq' | 'flashcard' | null
+  const loaderRef = useRef(null);
 
   const studentId = useMemo(() => user?._id || user?.id || '', [user]);
 
@@ -67,27 +70,35 @@ export default function RevisionModePage() {
 
   const generateFlashcards = async () => {
     try {
-      setError(''); setIsLoading(true);
-      if (!studentId) { setError('Session expired. Please sign in again.'); return; }
+      setError(''); setIsLoading(true); setLoaderType('flashcard');
+      if (!studentId) { setError('Session expired. Please sign in again.'); setLoaderType(null); return; }
       const payload = await apiRequest('/revision/flashcards/generate', {
         method: 'POST', body: { student_id: studentId, transcript_ids: selectedIds, count, difficulty },
       });
       setFlashcards(payload.flashcards || []);
+      loaderRef.current?.complete();
       await loadProgress();
-    } catch (e) { setError(e.message || 'Failed to generate flashcards'); }
+    } catch (e) { setError(e.message || 'Failed to generate flashcards'); setLoaderType(null); }
     finally { setIsLoading(false); }
   };
 
   const generateMcqs = async () => {
     try {
       setError(''); setIsLoading(true);
-      if (!studentId) { setError('Session expired. Please sign in again.'); return; }
+      if (!studentId) { setError('Session expired. Please sign in again.'); setLoaderType(null); return; }
       const payload = await apiRequest('/revision/mcq/generate', {
         method: 'POST', body: { student_id: studentId, transcript_ids: selectedIds, count, difficulty },
       });
+      // Debug: inspect the raw API response shape
+      console.log('[REVISION] MCQ RAW RESPONSE:', JSON.stringify(payload, null, 2));
+      console.log('[REVISION] questions count:', payload.questions?.length);
+      if (payload.questions?.[0]) {
+        console.log('[REVISION] first question sample:', JSON.stringify(payload.questions[0], null, 2));
+      }
       setMcqs(payload.questions || []);
+      loaderRef.current?.complete();
       await loadProgress();
-    } catch (e) { setError(e.message || 'Failed to generate MCQs'); }
+    } catch (e) { setError(e.message || 'Failed to generate MCQs'); setLoaderType(null); }
     finally { setIsLoading(false); }
   };
 
@@ -142,6 +153,13 @@ export default function RevisionModePage() {
             onReviewWeakTopics={() => setSelectedIds([])} />
         </div>
       </div>
+
+      <GenerationLoader
+        ref={loaderRef}
+        isOpen={!!loaderType}
+        type={loaderType || 'mcq'}
+        onComplete={() => setLoaderType(null)}
+      />
     </div>
   );
 }

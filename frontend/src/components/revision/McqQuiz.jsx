@@ -1,6 +1,51 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 
 const OPTION_KEYS = ['A', 'B', 'C', 'D'];
+
+/**
+ * Normalize options from any format:
+ *   object  → { A: "text", B: "text", ... }
+ *   array   → [{ label: "A", text: "..." }, ...]  OR  ["text", "text", ...]
+ * Returns a safe { A, B, C, D } object.
+ */
+function normalizeOptions(raw) {
+  if (!raw) return {};
+
+  // Already an object with A/B/C/D keys
+  if (typeof raw === 'object' && !Array.isArray(raw)) {
+    // check if it has A/B/C/D with truthy string values
+    if (raw.A || raw.B || raw.C || raw.D) return raw;
+    // fallback: might have lowercase keys
+    if (raw.a || raw.b || raw.c || raw.d) {
+      return { A: raw.a || '', B: raw.b || '', C: raw.c || '', D: raw.d || '' };
+    }
+    return raw;
+  }
+
+  // Array of objects with label+text
+  if (Array.isArray(raw)) {
+    const result = {};
+    raw.forEach((item, i) => {
+      const key = OPTION_KEYS[i] || String.fromCharCode(65 + i);
+      if (typeof item === 'string') {
+        result[key] = item;
+      } else if (item && typeof item === 'object') {
+        result[item.label || key] = item.text || item.value || item.content || '';
+      }
+    });
+    return result;
+  }
+
+  return {};
+}
+
+/**
+ * Extract question text from various possible field names
+ */
+function getQuestionText(q) {
+  if (!q) return '';
+  return q.question || q.content || q.body || q.text || q.title || '';
+}
 
 export default function McqQuiz({ questions, onSubmitBatch, isLoading }) {
   const [index, setIndex] = useState(0);
@@ -13,6 +58,15 @@ export default function McqQuiz({ questions, onSubmitBatch, isLoading }) {
     [questions, index],
   );
 
+  // Debug logging — remove once confirmed
+  useEffect(() => {
+    if (currentQuestion) {
+      console.log('[MCQ] currentQuestion:', JSON.stringify(currentQuestion, null, 2));
+      console.log('[MCQ] options type:', typeof currentQuestion.options, Array.isArray(currentQuestion.options) ? 'array' : 'not-array');
+      console.log('[MCQ] normalized:', normalizeOptions(currentQuestion.options));
+    }
+  }, [currentQuestion]);
+
   if (!currentQuestion) {
     return (
       <section className="card revision-card">
@@ -22,10 +76,13 @@ export default function McqQuiz({ questions, onSubmitBatch, isLoading }) {
     );
   }
 
+  const questionText = getQuestionText(currentQuestion);
+  const options = normalizeOptions(currentQuestion.options);
+
   const submitAnswer = async () => {
     if (!selected) return;
     const payload = await onSubmitBatch([
-      { question_id: currentQuestion.id, selected, time_taken_ms: 0 },
+      { question_id: currentQuestion.id || currentQuestion._id, selected, time_taken_ms: 0 },
     ]);
     const result = payload?.submitted?.[0];
     setFeedback(result || null);
@@ -51,12 +108,13 @@ export default function McqQuiz({ questions, onSubmitBatch, isLoading }) {
         <div className="mcq-progress-bar__fill" style={{ width: `${((index + (feedback ? 1 : 0)) / questions.length) * 100}%` }} />
       </div>
 
-      <p className="mcq-question">{currentQuestion.question}</p>
+      <p className="mcq-question">
+        {questionText || <span style={{ color: 'var(--accent-rose)', fontStyle: 'italic' }}>[Question text missing]</span>}
+      </p>
 
       <div className="mcq-options">
         {OPTION_KEYS.map(key => {
-          /* BUG FIX: options is an object {A:"text", B:"text", ...} — read it properly */
-          const optionText = currentQuestion.options?.[key] ?? '';
+          const optionText = options[key] ?? '';
           const isCorrectAnswer = feedback?.correct === key;
           const isSelectedWrong = feedback && feedback.selected === key && feedback.correct !== key;
 
@@ -73,7 +131,9 @@ export default function McqQuiz({ questions, onSubmitBatch, isLoading }) {
               disabled={!!feedback || isLoading}
             >
               <span className="mcq-option__label">{key}</span>
-              <span className="mcq-option__text">{optionText}</span>
+              <span className="mcq-option__text">
+                {optionText || <em style={{ color: 'var(--text-muted)' }}>[empty]</em>}
+              </span>
             </button>
           );
         })}
