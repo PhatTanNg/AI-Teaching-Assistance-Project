@@ -25,10 +25,10 @@ const SignUp = () => {
   };
 
   return (
-    <div className="page">
+    <div className="auth-page">
       <AuthForm error={error} isSubmitting={isSubmitting} mode="signup" onSubmit={handleSubmit} />
-      <p className="card__meta">
-        Already have an account? <Link to="/signin">Sign in</Link>.
+      <p className="auth-footer">
+        Already have an account? <Link to="/signin">Sign in</Link>
       </p>
     </div>
   );

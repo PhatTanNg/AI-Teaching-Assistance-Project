@@ -5,9 +5,9 @@ const countOptions = [5, 10, 20];
 
 const formatDate = (value) => {
   if (!value) return 'Unknown date';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'Unknown date';
-  return date.toLocaleDateString();
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return 'Unknown date';
+  return d.toLocaleDateString();
 };
 
 export default function TranscriptSelector({
@@ -22,78 +22,73 @@ export default function TranscriptSelector({
   onGenerateMcqs,
   isLoading,
 }) {
-  const transcriptRows = useMemo(() => transcripts || [], [transcripts]);
+  const rows = useMemo(() => transcripts || [], [transcripts]);
 
   return (
-    <section className="card" aria-label="Transcript selector">
-      <h2>Select Transcripts for Revision</h2>
+    <section className="card revision-selector" aria-label="Transcript selector">
+      <h2 className="revision-card__title">Select Transcripts for Revision</h2>
 
-      <div>
-        {transcriptRows.length === 0 ? (
-          <p>No transcripts available.</p>
+      <div className="revision-selector__list">
+        {rows.length === 0 ? (
+          <p style={{ color: 'var(--text-muted)', padding: '1rem 0' }}>No transcripts available.</p>
         ) : (
-          transcriptRows.map((transcript, index) => (
-            <label key={transcript._id || transcript.id || index} className="revision-selector__item">
-              <input
-                type="checkbox"
-                checked={selectedIds.includes(transcript._id || transcript.id)}
-                onChange={() => onToggleTranscript(transcript._id || transcript.id)}
-                disabled={isLoading}
-              />
-              <span>
-                Transcript {index + 1} — "{transcript.subject || 'Untitled'}" ({formatDate(transcript.transcribedAt)})
-              </span>
-            </label>
-          ))
+          rows.map((t, i) => {
+            const id = t._id || t.id;
+            const isChecked = selectedIds.includes(id);
+            return (
+              <label key={id || i} className={`revision-selector__item ${isChecked ? 'revision-selector__item--active' : ''}`}>
+                <input type="checkbox" checked={isChecked}
+                  onChange={() => onToggleTranscript(id)} disabled={isLoading} />
+                <span>
+                  <strong>{t.subject || 'Untitled'}</strong>
+                  <span style={{ color: 'var(--text-muted)', marginLeft: '0.5rem', fontSize: '0.8rem' }}>
+                    {formatDate(t.transcribedAt)}
+                  </span>
+                </span>
+              </label>
+            );
+          })
         )}
       </div>
 
-      <div>
-        <p>Difficulty:</p>
-        {difficultyOptions.map((value) => (
-          <button
-            key={value}
-            type="button"
-            className={`btn ${difficulty === value ? '' : 'btn--ghost'}`}
-            onClick={() => onDifficultyChange(value)}
-            disabled={isLoading}
-          >
-            {value}
-          </button>
-        ))}
+      {/* Config strip */}
+      <div className="revision-selector__config">
+        <div className="revision-selector__group">
+          <span className="revision-selector__label">Difficulty</span>
+          <div className="revision-selector__pills">
+            {difficultyOptions.map(v => (
+              <button key={v} type="button"
+                className={`pill ${difficulty === v ? 'pill--active' : ''}`}
+                onClick={() => onDifficultyChange(v)} disabled={isLoading}>
+                {v}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="revision-selector__group">
+          <span className="revision-selector__label">Count</span>
+          <div className="revision-selector__pills">
+            {countOptions.map(v => (
+              <button key={v} type="button"
+                className={`pill ${count === v ? 'pill--active' : ''}`}
+                onClick={() => onCountChange(v)} disabled={isLoading}>
+                {v}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
-      <div>
-        <p>Count:</p>
-        {countOptions.map((value) => (
-          <button
-            key={value}
-            type="button"
-            className={`btn ${count === value ? '' : 'btn--ghost'}`}
-            onClick={() => onCountChange(value)}
-            disabled={isLoading}
-          >
-            {value}
-          </button>
-        ))}
-      </div>
-
-      <div>
-        <button
-          type="button"
-          className="btn"
-          onClick={onGenerateFlashcards}
-          disabled={isLoading || selectedIds.length === 0}
-        >
-          Generate Flashcards
+      {/* Action buttons */}
+      <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+        <button type="button" className="btn" onClick={onGenerateFlashcards}
+          disabled={isLoading || selectedIds.length === 0}>
+          {isLoading ? 'Generating…' : '🃏 Generate Flashcards'}
         </button>
-        <button
-          type="button"
-          className="btn"
-          onClick={onGenerateMcqs}
-          disabled={isLoading || selectedIds.length === 0}
-        >
-          Generate MCQs
+        <button type="button" className="btn btn--ghost" onClick={onGenerateMcqs}
+          disabled={isLoading || selectedIds.length === 0}>
+          {isLoading ? 'Generating…' : '📝 Generate MCQs'}
         </button>
       </div>
     </section>

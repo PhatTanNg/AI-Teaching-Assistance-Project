@@ -30,7 +30,6 @@ const Keywords = () => {
   const [newKeywordDef, setNewKeywordDef] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Load transcripts on mount
   useEffect(() => {
     const loadTranscripts = async () => {
       if (!token) return;
@@ -45,41 +44,21 @@ const Keywords = () => {
         setLoading(false);
       }
     };
-
     loadTranscripts();
   }, [token]);
 
-  // Load keyword groups when transcript is selected
   useEffect(() => {
     const loadKeywords = async () => {
       if (!selectedTranscript || !token) return;
       try {
-        console.log('[KEYWORDS] Loading keywords for transcript:', selectedTranscript);
         const transcriptObj = transcripts.find(t => t._id === selectedTranscript);
-        
-        if (!transcriptObj) {
-          console.warn('[KEYWORDS] Transcript not found:', selectedTranscript);
-          setKeywordGroups([]);
-          return;
-        }
-
-        console.log('[KEYWORDS] Transcript object:', { _id: transcriptObj._id, sessionId: transcriptObj.sessionId });
+        if (!transcriptObj) { setKeywordGroups([]); return; }
 
         if (transcriptObj.sessionId) {
-          console.log('[KEYWORDS] Fetching keywords by sessionId:', transcriptObj.sessionId);
           const kws = await getKeywordsBySession(token, transcriptObj.sessionId);
-          console.log('[KEYWORDS] Fetched keywords:', kws.length, 'keywords');
-          setKeywordGroups([
-            {
-              _id: transcriptObj.sessionId,
-              transcriptId: selectedTranscript,
-              keywords: kws,
-            },
-          ]);
+          setKeywordGroups([{ _id: transcriptObj.sessionId, transcriptId: selectedTranscript, keywords: kws }]);
         } else {
-          console.log('[KEYWORDS] No sessionId, trying getKeywordGroupsByTranscript');
           const data = await getKeywordGroupsByTranscript(token, selectedTranscript);
-          console.log('[KEYWORDS] Fetched keyword groups:', data.length);
           setKeywordGroups(data);
         }
       } catch (err) {
@@ -87,7 +66,6 @@ const Keywords = () => {
         setError('Failed to load keywords');
       }
     };
-
     loadKeywords();
   }, [selectedTranscript, token, transcripts]);
 
@@ -97,24 +75,13 @@ const Keywords = () => {
   };
 
   const handleSaveDefinition = async (keywordId) => {
-    if (!token || !editingDefinition.trim()) {
-      setError('Definition cannot be empty');
-      return;
-    }
-
+    if (!token || !editingDefinition.trim()) { setError('Definition cannot be empty'); return; }
     try {
       await updateKeywordDefinition(token, keywordId, { definition: editingDefinition.trim() });
-      
-      // Update local state
-      setKeywordGroups(prevGroups =>
-        prevGroups.map(group => ({
-          ...group,
-          keywords: group.keywords.map(kw =>
-            kw._id === keywordId ? { ...kw, definition: editingDefinition.trim() } : kw
-          )
-        }))
-      );
-
+      setKeywordGroups(prev => prev.map(g => ({
+        ...g,
+        keywords: g.keywords.map(kw => kw._id === keywordId ? { ...kw, definition: editingDefinition.trim() } : kw),
+      })));
       setEditingKeywordId(null);
       setEditingDefinition('');
       setSuccessMessage('Definition updated successfully');
@@ -127,23 +94,10 @@ const Keywords = () => {
 
   const handleDeleteKeyword = async (keywordGroupId, keywordId) => {
     if (!confirm('Are you sure you want to delete this keyword?')) return;
-
-    if (!token) {
-      setError('Not authenticated');
-      return;
-    }
-
+    if (!token) { setError('Not authenticated'); return; }
     try {
       await removeKeywordFromGroup(token, keywordGroupId, keywordId);
-
-      // Update local state
-      setKeywordGroups(prevGroups =>
-        prevGroups.map(group => ({
-          ...group,
-          keywords: group.keywords.filter(kw => kw._id !== keywordId)
-        }))
-      );
-
+      setKeywordGroups(prev => prev.map(g => ({ ...g, keywords: g.keywords.filter(kw => kw._id !== keywordId) })));
       setSuccessMessage('Keyword deleted successfully');
       setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
@@ -157,14 +111,12 @@ const Keywords = () => {
       setError('Please fill in both fields and select a transcript');
       return;
     }
-
     try {
       const keywordGroup = keywordGroups[0];
       const result = await addKeywordToGroup(token, keywordGroup._id, {
         keywordText: newKeywordText.trim(),
         definition: newKeywordDef.trim(),
       });
-
       setKeywordGroups([result]);
       setNewKeywordText('');
       setNewKeywordDef('');
@@ -182,13 +134,20 @@ const Keywords = () => {
   );
 
   if (loading) {
-    return <div className="page"><p>Loading...</p></div>;
+    return (
+      <div className="page-state">
+        <div className="spinner" />
+        <p>Loading keywords…</p>
+      </div>
+    );
   }
 
   return (
-    <div style={{ width: '100%', maxWidth: '1200px', margin: '0 auto', padding: '2rem' }}>
-      <h1 className="card__title">Manage Keywords</h1>
-      <p className="card__subtitle">Edit keyword definitions for your lectures</p>
+    <div className="page" style={{ width: '100%', maxWidth: '100%' }}>
+      <div style={{ marginBottom: '1.5rem' }}>
+        <h1>Manage Keywords</h1>
+        <p className="card__subtitle">Edit keyword definitions for your lectures</p>
+      </div>
 
       {error && (
         <Alert variant="destructive" style={{ marginBottom: '1rem' }}>
@@ -197,28 +156,24 @@ const Keywords = () => {
       )}
 
       {successMessage && (
-        <Alert style={{ marginBottom: '1rem', background: '#dcfce7', border: '1px solid #86efac' }}>
-          <AlertDescription style={{ color: '#166534' }}>{successMessage}</AlertDescription>
+        <Alert style={{ marginBottom: '1rem', background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.2)' }}>
+          <AlertDescription style={{ color: 'var(--accent-green)' }}>{successMessage}</AlertDescription>
         </Alert>
       )}
 
-      <div className="card" style={{ marginBottom: '2rem' }}>
+      {/* Transcript Selector */}
+      <div className="card" style={{ marginBottom: '1.5rem' }}>
         <Label className="form-label">Select Transcript</Label>
         <select
           value={selectedTranscript}
           onChange={(e) => setSelectedTranscript(e.target.value)}
-          style={{
-            width: '100%',
-            padding: '0.75rem',
-            borderRadius: '0.5rem',
-            border: '1px solid #ccc',
-            fontSize: '1rem'
-          }}
+          className="form-input"
+          style={{ appearance: 'auto' }}
         >
           <option value="">-- Select a transcript --</option>
           {transcripts.map(transcript => (
             <option key={transcript._id} value={transcript._id}>
-              {transcript.subject} - {new Date(transcript.transcribedAt).toLocaleDateString()}
+              {transcript.subject} — {new Date(transcript.transcribedAt).toLocaleDateString()}
             </option>
           ))}
         </select>
@@ -226,120 +181,76 @@ const Keywords = () => {
 
       {selectedTranscript && (
         <>
-          {/* Search Bar */}
-          <div className="card" style={{ marginBottom: '2rem' }}>
+          {/* Search */}
+          <div className="card" style={{ marginBottom: '1.5rem' }}>
             <div style={{ position: 'relative' }}>
-              <Search style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', width: '1rem', height: '1rem', color: '#9ca3af' }} />
-              <Input
-                placeholder="Search keywords..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="form-input"
-                style={{ paddingLeft: '2.5rem' }}
-              />
+              <Search style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', width: '1rem', height: '1rem', color: 'var(--text-muted)' }} />
+              <Input placeholder="Search keywords…" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+                className="form-input" style={{ paddingLeft: '2.5rem' }} />
             </div>
           </div>
 
           {/* Add New Keyword */}
-          <div className="card" style={{ marginBottom: '2rem' }}>
-            <h3 style={{ marginBottom: '1rem', fontSize: '1.125rem', fontWeight: '600' }}>Add New Keyword</h3>
+          <div className="card" style={{ marginBottom: '1.5rem' }}>
+            <h3 style={{ marginBottom: '1rem', fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-primary)' }}>Add New Keyword</h3>
             <div style={{ display: 'grid', gap: '1rem' }}>
               <div>
                 <Label className="form-label">Keyword Text</Label>
-                <Input
-                  placeholder="Enter keyword"
-                  value={newKeywordText}
-                  onChange={(e) => setNewKeywordText(e.target.value)}
-                  className="form-input"
-                />
+                <Input placeholder="Enter keyword" value={newKeywordText} onChange={(e) => setNewKeywordText(e.target.value)}
+                  className="form-input" />
               </div>
               <div>
                 <Label className="form-label">Definition</Label>
-                <textarea
-                  placeholder="Enter definition"
-                  value={newKeywordDef}
-                  onChange={(e) => setNewKeywordDef(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    borderRadius: '0.5rem',
-                    border: '1px solid #ccc',
-                    fontSize: '1rem',
-                    fontFamily: 'sans-serif',
-                    minHeight: '100px'
-                  }}
-                />
+                <textarea placeholder="Enter definition" value={newKeywordDef} onChange={(e) => setNewKeywordDef(e.target.value)}
+                  className="neon-textarea" style={{ minHeight: '100px' }} />
               </div>
-              <Button onClick={handleAddKeyword} className="btn btn--primary" style={{ alignSelf: 'flex-start' }}>
-                <Plus style={{ width: '1rem', height: '1rem' }} />
-                Add Keyword
+              <Button onClick={handleAddKeyword} className="btn" style={{ alignSelf: 'flex-start' }}>
+                <Plus size={16} /> Add Keyword
               </Button>
             </div>
           </div>
 
           {/* Keywords List */}
           <div className="card">
-            <h3 style={{ marginBottom: '1rem', fontSize: '1.125rem', fontWeight: '600' }}>
+            <h3 style={{ marginBottom: '1rem', fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-primary)' }}>
               Keywords ({filteredKeywords.length})
             </h3>
 
             {filteredKeywords.length === 0 ? (
-              <div style={{ padding: '2rem', textAlign: 'center', background: '#f3f4f6', borderRadius: '0.75rem', border: '1px solid #e5e7eb' }}>
-                <p style={{ color: '#9ca3af', marginBottom: '1rem' }}>
+              <div style={{ padding: '2rem', textAlign: 'center', background: 'var(--bg-elevated)', borderRadius: '0.75rem', border: '1px solid var(--glass-border)' }}>
+                <p style={{ color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
                   {searchTerm ? 'No keywords found' : 'No keywords for this transcript yet'}
                 </p>
-                <p style={{ color: '#9ca3af', fontSize: '0.875rem' }}>
-                  {!searchTerm && 'Keywords will appear here after you save a transcript or manually add them below.'}
-                </p>
+                {!searchTerm && (
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                    Keywords will appear here after you save a transcript or manually add them.
+                  </p>
+                )}
               </div>
             ) : (
-              <div style={{ display: 'grid', gap: '1rem' }}>
+              <div style={{ display: 'grid', gap: '0.75rem' }}>
                 {filteredKeywords.map(keyword => (
-                  <div
-                    key={keyword._id}
-                    style={{
-                      padding: '1rem',
-                      border: '1px solid #e5e7eb',
-                      borderRadius: '0.75rem',
-                      background: '#f9fafb'
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
-                      <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: '600' }}>{keyword.keywordText}</h4>
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <div key={keyword._id} className="keyword-item">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+                      <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: 'var(--accent-cyan)' }}>{keyword.keywordText}</h4>
+                      <div style={{ display: 'flex', gap: '0.25rem' }}>
                         {editingKeywordId === keyword._id ? (
                           <>
-                            <Button
-                              onClick={() => handleSaveDefinition(keyword._id)}
-                              size="sm"
-                              className="btn btn--primary"
-                            >
-                              <Save style={{ width: '1rem', height: '1rem' }} />
+                            <Button onClick={() => handleSaveDefinition(keyword._id)} size="sm" className="btn btn--sm">
+                              <Save size={14} />
                             </Button>
-                            <Button
-                              onClick={() => setEditingKeywordId(null)}
-                              size="sm"
-                              className="btn btn--ghost"
-                            >
-                              <X style={{ width: '1rem', height: '1rem' }} />
+                            <Button onClick={() => setEditingKeywordId(null)} size="sm" className="btn btn--ghost btn--sm">
+                              <X size={14} />
                             </Button>
                           </>
                         ) : (
                           <>
-                            <Button
-                              onClick={() => handleEditDefinition(keyword._id, keyword.definition)}
-                              size="sm"
-                              className="btn btn--ghost"
-                            >
-                              <Edit2 style={{ width: '1rem', height: '1rem' }} />
+                            <Button onClick={() => handleEditDefinition(keyword._id, keyword.definition)} size="sm" className="btn btn--ghost btn--sm">
+                              <Edit2 size={14} />
                             </Button>
-                            <Button
-                              onClick={() => handleDeleteKeyword(keywordGroups[0]._id, keyword._id)}
-                              size="sm"
-                              className="btn btn--ghost"
-                              style={{ color: '#dc2626' }}
-                            >
-                              <Trash2 style={{ width: '1rem', height: '1rem' }} />
+                            <Button onClick={() => handleDeleteKeyword(keywordGroups[0]._id, keyword._id)} size="sm"
+                              className="btn btn--ghost btn--sm" style={{ color: 'var(--accent-rose)' }}>
+                              <Trash2 size={14} />
                             </Button>
                           </>
                         )}
@@ -347,21 +258,10 @@ const Keywords = () => {
                     </div>
 
                     {editingKeywordId === keyword._id ? (
-                      <textarea
-                        value={editingDefinition}
-                        onChange={(e) => setEditingDefinition(e.target.value)}
-                        style={{
-                          width: '100%',
-                          padding: '0.75rem',
-                          borderRadius: '0.5rem',
-                          border: '2px solid #3b82f6',
-                          fontSize: '0.95rem',
-                          fontFamily: 'sans-serif',
-                          minHeight: '80px'
-                        }}
-                      />
+                      <textarea value={editingDefinition} onChange={(e) => setEditingDefinition(e.target.value)}
+                        className="neon-textarea" style={{ minHeight: '80px' }} />
                     ) : (
-                      <p style={{ margin: 0, color: '#4b5563', lineHeight: '1.6' }}>
+                      <p style={{ margin: 0, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
                         {keyword.definition || 'No definition'}
                       </p>
                     )}

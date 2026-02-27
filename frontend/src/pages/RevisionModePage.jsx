@@ -9,28 +9,18 @@ const apiBase = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5001';
 const tokenKey = 'aita_access_token';
 
 const getToken = () => {
-  try {
-    return localStorage.getItem(tokenKey) || '';
-  } catch {
-    return '';
-  }
+  try { return localStorage.getItem(tokenKey) || ''; } catch { return ''; }
 };
 
 const apiRequest = async (path, { method = 'GET', body } = {}) => {
-  const response = await fetch(`${apiBase}${path}`, {
+  const res = await fetch(`${apiBase}${path}`, {
     method,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${getToken()}`,
-    },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
     body: body ? JSON.stringify(body) : undefined,
     credentials: 'include',
   });
-
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(payload?.message || 'Revision request failed');
-  }
+  const payload = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(payload?.message || 'Revision request failed');
   return payload;
 };
 
@@ -60,7 +50,6 @@ export default function RevisionModePage() {
       apiRequest(`/revision/progress/${studentId}`),
       apiRequest(`/revision/weak-topics/${studentId}`),
     ]);
-
     setProgress(progressPayload);
     setWeakTopics(weakPayload?.weak_topics || []);
   };
@@ -68,126 +57,91 @@ export default function RevisionModePage() {
   useEffect(() => {
     setIsLoading(true);
     Promise.all([loadTranscripts(), loadProgress()])
-      .catch((requestError) => setError(requestError.message || 'Failed to load revision data'))
+      .catch(e => setError(e.message || 'Failed to load revision data'))
       .finally(() => setIsLoading(false));
   }, []);
 
   const toggleTranscript = (id) => {
-    setSelectedIds((current) =>
-      current.includes(id) ? current.filter((item) => item !== id) : [...current, id],
-    );
+    setSelectedIds(curr => curr.includes(id) ? curr.filter(x => x !== id) : [...curr, id]);
   };
 
   const generateFlashcards = async () => {
     try {
-      setError('');
-      setIsLoading(true);
-      if (!studentId) {
-        setError('Session expired. Please sign in again.');
-        return;
-      }
+      setError(''); setIsLoading(true);
+      if (!studentId) { setError('Session expired. Please sign in again.'); return; }
       const payload = await apiRequest('/revision/flashcards/generate', {
-        method: 'POST',
-        body: {
-          student_id: studentId,
-          transcript_ids: selectedIds,
-          count,
-          difficulty,
-        },
+        method: 'POST', body: { student_id: studentId, transcript_ids: selectedIds, count, difficulty },
       });
       setFlashcards(payload.flashcards || []);
       await loadProgress();
-    } catch (requestError) {
-      setError(requestError.message || 'Failed to generate flashcards');
-    } finally {
-      setIsLoading(false);
-    }
+    } catch (e) { setError(e.message || 'Failed to generate flashcards'); }
+    finally { setIsLoading(false); }
   };
 
   const generateMcqs = async () => {
     try {
-      setError('');
-      setIsLoading(true);
-      if (!studentId) {
-        setError('Session expired. Please sign in again.');
-        return;
-      }
+      setError(''); setIsLoading(true);
+      if (!studentId) { setError('Session expired. Please sign in again.'); return; }
       const payload = await apiRequest('/revision/mcq/generate', {
-        method: 'POST',
-        body: {
-          student_id: studentId,
-          transcript_ids: selectedIds,
-          count,
-          difficulty,
-        },
+        method: 'POST', body: { student_id: studentId, transcript_ids: selectedIds, count, difficulty },
       });
       setMcqs(payload.questions || []);
       await loadProgress();
-    } catch (requestError) {
-      setError(requestError.message || 'Failed to generate MCQs');
-    } finally {
-      setIsLoading(false);
-    }
+    } catch (e) { setError(e.message || 'Failed to generate MCQs'); }
+    finally { setIsLoading(false); }
   };
 
   const rateFlashcard = async (flashcardId, rating) => {
-    if (!studentId) {
-      throw new Error('Session expired. Please sign in again.');
-    }
+    if (!studentId) throw new Error('Session expired.');
     const payload = await apiRequest('/revision/flashcard/rate', {
-      method: 'POST',
-      body: {
-        flashcard_id: flashcardId,
-        student_id: studentId,
-        rating,
-      },
+      method: 'POST', body: { flashcard_id: flashcardId, student_id: studentId, rating },
     });
     await loadProgress();
     return payload;
   };
 
   const submitMcqAnswers = async (answers) => {
-    if (!studentId) {
-      throw new Error('Session expired. Please sign in again.');
-    }
+    if (!studentId) throw new Error('Session expired.');
     const payload = await apiRequest('/revision/mcq/submit', {
-      method: 'POST',
-      body: {
-        student_id: studentId,
-        answers,
-      },
+      method: 'POST', body: { student_id: studentId, answers },
     });
     await loadProgress();
     return payload;
   };
 
   return (
-    <div>
-      <h1>Revision Mode</h1>
-      {error ? <p role="alert">{error}</p> : null}
+    <div className="page" style={{ width: '100%', maxWidth: '100%' }}>
+      <div style={{ marginBottom: '1.5rem' }}>
+        <h1>Revision Mode</h1>
+        <p className="card__subtitle">Generate flashcards & MCQs from your transcripts, track your progress</p>
+      </div>
 
-      <TranscriptSelector
-        transcripts={transcripts}
-        selectedIds={selectedIds}
-        onToggleTranscript={toggleTranscript}
-        difficulty={difficulty}
-        onDifficultyChange={setDifficulty}
-        count={count}
-        onCountChange={setCount}
-        onGenerateFlashcards={generateFlashcards}
-        onGenerateMcqs={generateMcqs}
-        isLoading={isLoading}
-      />
+      {error && (
+        <div style={{ padding: '1rem', background: 'rgba(251,113,133,0.08)', border: '1px solid rgba(251,113,133,0.2)', borderRadius: '0.75rem', color: 'var(--accent-rose)', marginBottom: '1.5rem' }}>
+          {error}
+        </div>
+      )}
 
-      <FlashcardReview cards={flashcards} onRate={rateFlashcard} isLoading={isLoading} />
-      <McqQuiz questions={mcqs} onSubmitBatch={submitMcqAnswers} isLoading={isLoading} />
-      <ProgressDashboard
-        progress={progress}
-        weakTopics={weakTopics}
-        onReviewWeakTopics={() => {
-          setSelectedIds([]);
-        }}
-      />
+      <div className="revision-layout">
+        {/* Left column — selector + review */}
+        <div className="revision-main">
+          <TranscriptSelector
+            transcripts={transcripts} selectedIds={selectedIds}
+            onToggleTranscript={toggleTranscript} difficulty={difficulty}
+            onDifficultyChange={setDifficulty} count={count}
+            onCountChange={setCount} onGenerateFlashcards={generateFlashcards}
+            onGenerateMcqs={generateMcqs} isLoading={isLoading}
+          />
+          <FlashcardReview cards={flashcards} onRate={rateFlashcard} isLoading={isLoading} />
+          <McqQuiz questions={mcqs} onSubmitBatch={submitMcqAnswers} isLoading={isLoading} />
+        </div>
+
+        {/* Right column — progress */}
+        <div className="revision-aside">
+          <ProgressDashboard progress={progress} weakTopics={weakTopics}
+            onReviewWeakTopics={() => setSelectedIds([])} />
+        </div>
+      </div>
     </div>
   );
 }
