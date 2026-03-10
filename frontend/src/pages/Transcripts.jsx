@@ -109,15 +109,25 @@ const Transcripts = () => {
       )}
 
       {transcripts.length === 0 ? (
-        <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
-          <FileText size={48} style={{ margin: '0 auto 1rem', color: 'var(--text-muted)' }} />
-          <h3 style={{ marginBottom: '0.5rem' }}>No transcripts yet</h3>
-          <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
-            Start transcribing your first lecture to see it here
-          </p>
-          <Button className="btn" onClick={() => navigate('/transcribe')}>
-            Start Transcribing
-          </Button>
+        <div className="card">
+          <div className="empty-state">
+            {/* Inline SVG illustration */}
+            <svg className="empty-state__art" width="120" height="100" viewBox="0 0 120 100" fill="none" aria-hidden="true">
+              <rect x="20" y="20" width="80" height="60" rx="8" fill="rgba(110,231,247,0.08)" stroke="rgba(110,231,247,0.2)" strokeWidth="1.5"/>
+              <rect x="32" y="34" width="40" height="4" rx="2" fill="rgba(110,231,247,0.3)"/>
+              <rect x="32" y="44" width="56" height="4" rx="2" fill="rgba(110,231,247,0.2)"/>
+              <rect x="32" y="54" width="48" height="4" rx="2" fill="rgba(110,231,247,0.15)"/>
+              <circle cx="90" cy="70" r="14" fill="rgba(167,139,250,0.1)" stroke="rgba(167,139,250,0.25)" strokeWidth="1.5"/>
+              <path d="M86 70 L89 73 L94 67" stroke="rgba(167,139,250,0.6)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            <div className="empty-state__title">No lectures recorded yet</div>
+            <p className="empty-state__desc">
+              Hit Record on the Transcribe page and let AI capture your first lecture 🎙️
+            </p>
+            <Button className="btn" onClick={() => navigate('/transcribe')}>
+              Start Recording
+            </Button>
+          </div>
         </div>
       ) : (
         <div className="transcripts-grid stagger">

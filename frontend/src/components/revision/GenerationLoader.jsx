@@ -17,6 +17,15 @@ const STEPS = {
   ],
 };
 
+const FUN_COPY = [
+  'Asking the AI very nicely… 🙏',
+  'Brewing your study material ☕',
+  'Turning lecture chaos into clarity ✨',
+  'Almost there, hang tight! 🚀',
+  'The AI is thinking hard for you 🤔',
+  'Making studying a little less painful 📚',
+];
+
 const GenerationLoader = forwardRef(function GenerationLoader(
   { isOpen, type = 'mcq', onComplete },
   ref,
@@ -27,13 +36,13 @@ const GenerationLoader = forwardRef(function GenerationLoader(
   const [activeStep, setActiveStep] = useState(0);
   const [progress, setProgress] = useState(0);
   const [done, setDone] = useState(false);
+  const [funCopyIdx, setFunCopyIdx] = useState(0);
 
-  // Refs to hold timer ids for cleanup
   const progressIntervalRef = useRef(null);
   const stepTimersRef = useRef([]);
+  const funCopyTimerRef = useRef(null);
   const startTimeRef = useRef(null);
 
-  // Cleanup all timers
   const clearAllTimers = useCallback(() => {
     if (progressIntervalRef.current) {
       clearInterval(progressIntervalRef.current);
@@ -41,9 +50,12 @@ const GenerationLoader = forwardRef(function GenerationLoader(
     }
     stepTimersRef.current.forEach(clearTimeout);
     stepTimersRef.current = [];
+    if (funCopyTimerRef.current) {
+      clearInterval(funCopyTimerRef.current);
+      funCopyTimerRef.current = null;
+    }
   }, []);
 
-  // Expose complete() to parent via ref
   useImperativeHandle(ref, () => ({
     complete() {
       clearAllTimers();
@@ -60,17 +72,18 @@ const GenerationLoader = forwardRef(function GenerationLoader(
       setActiveStep(0);
       setProgress(0);
       setDone(false);
+      setFunCopyIdx(0);
       return;
     }
 
-    // Reset state on open
     setActiveStep(0);
     setProgress(0);
     setDone(false);
+    setFunCopyIdx(0);
 
     startTimeRef.current = Date.now();
 
-    // Smooth progress bar — updates every 100ms, caps at 90%
+    // Progress bar
     progressIntervalRef.current = setInterval(() => {
       const elapsed = Date.now() - startTimeRef.current;
       const pct = Math.min((elapsed / totalMs) * 100, 90);
@@ -78,7 +91,7 @@ const GenerationLoader = forwardRef(function GenerationLoader(
       if (pct >= 90) clearInterval(progressIntervalRef.current);
     }, 100);
 
-    // Step advancement — schedule each step transition at its cumulative time
+    // Step advancement
     let cumulative = 0;
     stepTimersRef.current = steps.map((step, index) => {
       cumulative += step.ms;
@@ -86,6 +99,11 @@ const GenerationLoader = forwardRef(function GenerationLoader(
         setActiveStep(index + 1);
       }, cumulative);
     });
+
+    // Fun copy rotation
+    funCopyTimerRef.current = setInterval(() => {
+      setFunCopyIdx(i => (i + 1) % FUN_COPY.length);
+    }, 3000);
 
     return () => clearAllTimers();
   }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -110,8 +128,8 @@ const GenerationLoader = forwardRef(function GenerationLoader(
           <h2 className="gen-loader-title">
             {type === 'mcq' ? 'Generating Your MCQ Quiz' : 'Generating Flashcards'}
           </h2>
-          <p className="gen-loader-subtitle">
-            AI is reading your transcripts and crafting questions…
+          <p className="gen-loader-fun-copy" key={funCopyIdx}>
+            {FUN_COPY[funCopyIdx]}
           </p>
         </div>
 
@@ -130,7 +148,6 @@ const GenerationLoader = forwardRef(function GenerationLoader(
         <ul className="gen-step-list">
           {steps.map((step, i) => {
             const status = getStatus(i);
-
             return (
               <li key={step.id} className={`gen-step-item gen-step--${status}`}>
                 <span className="gen-step-icon">
@@ -145,7 +162,7 @@ const GenerationLoader = forwardRef(function GenerationLoader(
         </ul>
 
         <p className="gen-loader-note">
-          This usually takes 10–20 seconds. Please don't close this window.
+          Usually takes 10–20 seconds. Don't close this window ✌️
         </p>
       </div>
     </div>

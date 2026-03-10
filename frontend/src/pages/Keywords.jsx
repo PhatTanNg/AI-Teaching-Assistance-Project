@@ -217,15 +217,23 @@ const Keywords = () => {
             </h3>
 
             {filteredKeywords.length === 0 ? (
-              <div style={{ padding: '2rem', textAlign: 'center', background: 'var(--bg-elevated)', borderRadius: '0.75rem', border: '1px solid var(--glass-border)' }}>
-                <p style={{ color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
-                  {searchTerm ? 'No keywords found' : 'No keywords for this transcript yet'}
+              <div className="empty-state" style={{ padding: '2rem' }}>
+                <svg className="empty-state__art" width="100" height="90" viewBox="0 0 100 90" fill="none" aria-hidden="true">
+                  <rect x="10" y="15" width="80" height="55" rx="8" fill="rgba(167,139,250,0.08)" stroke="rgba(167,139,250,0.2)" strokeWidth="1.5"/>
+                  <rect x="22" y="28" width="20" height="6" rx="3" fill="rgba(167,139,250,0.35)"/>
+                  <rect x="48" y="28" width="28" height="6" rx="3" fill="rgba(110,231,247,0.25)"/>
+                  <rect x="22" y="40" width="36" height="6" rx="3" fill="rgba(167,139,250,0.2)"/>
+                  <rect x="64" y="40" width="14" height="6" rx="3" fill="rgba(110,231,247,0.15)"/>
+                  <rect x="22" y="52" width="26" height="6" rx="3" fill="rgba(167,139,250,0.15)"/>
+                </svg>
+                <div className="empty-state__title">
+                  {searchTerm ? 'No matches found' : 'No keywords yet'}
+                </div>
+                <p className="empty-state__desc">
+                  {searchTerm
+                    ? `Try a different search term`
+                    : 'Keywords appear after you save a transcript — or add them manually below 👇'}
                 </p>
-                {!searchTerm && (
-                  <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                    Keywords will appear here after you save a transcript or manually add them.
-                  </p>
-                )}
               </div>
             ) : (
               <div style={{ display: 'grid', gap: '0.75rem' }}>
