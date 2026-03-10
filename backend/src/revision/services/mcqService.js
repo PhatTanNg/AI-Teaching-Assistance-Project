@@ -128,11 +128,6 @@ export const generateMcqSet = async ({
   }
 
   const trimmed = valid.slice(0, count);
-  if (trimmed.length < count) {
-    const error = new Error('Unable to generate enough transcript-grounded MCQs');
-    error.statusCode = 422;
-    throw error;
-  }
 
   const setDoc = await RevisionSet.create({
     studentId,
