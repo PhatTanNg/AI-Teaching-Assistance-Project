@@ -1,77 +1,149 @@
-# AI Teaching Assistant
+# AITA — AI Teaching Assistance
 
-AI-powered lecture companion that records speech, generates transcripts, extracts key vocabulary, and surfaces concise definitions for students.
+An AI-powered lecture companion for students. Record or upload lectures, get real-time transcripts, auto-extract key terms with smart definitions, revise with flashcards and quizzes, and ask the Kiki AI tutor about your lecture content.
 
 ## Live Demo
 - [Hosted Web App](https://ai-teaching-assistance-project.vercel.app/)
 
-## System Overview
-- **Frontend (React + Vite):** Real-time transcript view, keyword sidebar, manual keyword selection, persistent storage via `localStorage`.
-- **Node.js Backend (Express):** REST APIs, authentication, Google Speech-to-Text integration, and a proxy endpoint that forwards keyword analysis requests to Python.
-- **Python Keyword Service (Flask + NLTK):** POS-tag-based keyword extraction and Wikipedia-powered definition lookup.
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Frontend | React 18 + Vite 5, Tailwind CSS, shadcn/ui, React Router v7 |
+| Backend | Node.js + Express, MongoDB + Mongoose |
+| AI / Speech | OpenAI GPT-4o-mini (chat, correction), GPT-3.5-turbo (keywords, definitions, summaries), Whisper (file transcription) |
+| Auth | JWT (access token in `localStorage`) |
+| Realtime | Web Speech API (live recording), SSE (AI chat streaming) |
+
+---
+
+## Features
+
+- **Live Recording** — Capture speech via Web Speech API with real-time 3-layer display (settled text / AI-correcting / interim cursor)
+- **File Upload** — Upload MP3, M4A, WAV, OGG, or WebM files (up to 25 MB); transcribed via OpenAI Whisper
+- **AI Auto-correct** — Each speech chunk is silently corrected by GPT for filler words and mishearing
+- **Smart Keyword Extraction** — GPT extracts only genuine educational/technical terms (not common words); definitions generated in the same language as the lecture (Vietnamese or English)
+- **Summaries** — Auto-generated after saving; editable on the Transcripts page
+- **Revision Mode** — Generate flashcards and MCQ quizzes from saved transcripts with difficulty settings
+- **Kiki AI Chat** — Streaming chat assistant (🐒) with lecture context awareness; available on every page via FAB
+- **i18n** — Interface language toggle between English and Vietnamese
+- **Profile** — Display name, date of birth, password change
+- **Dark / Light mode** — Persistent theme toggle in the sidebar
+
+---
 
 ## Prerequisites
+
 - Node.js 18+
-- Python 3.8+
-- npm or pnpm
-- (Optional) Google Cloud project with Speech-to-Text enabled and `GOOGLE_APPLICATION_CREDENTIALS` pointing to a service-account JSON.
+- npm
+- MongoDB instance (local or Atlas)
+- OpenAI API key
+
+---
 
 ## Quick Start
 
-### Node.js Backend
+### 1. Backend
+
 ```bash
 cd backend
 npm install
-# copy .env.example to .env and configure JWT secrets, MongoDB URI, GOOGLE_APPLICATION_CREDENTIALS, etc.
-npm run dev
+cp .env.example .env   # then fill in your values
+npm run dev            # runs on http://localhost:5001
 ```
 
-### Python Keyword Service
-```bash
-cd python-backend
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-# macOS/Linux: source .venv/bin/activate
-pip install -r requirements.txt
-python app.py
+**Required `.env` variables:**
+```
+MONGODB_URI=mongodb://...
+JWT_SECRET=your_secret
+OPENAI_API_KEY=sk-...
 ```
 
-### React Frontend
+### 2. Frontend
+
 ```bash
 cd frontend
 npm install
-# For local development, create .env.local to override API URL safely (ignored by git)
-echo VITE_API_BASE_URL=http://localhost:5001 > .env.local
-npm run dev
+echo "VITE_API_BASE_URL=http://localhost:5001" > .env.local
+npm run dev            # runs on http://localhost:5173
 ```
 
-### Frontend Environment Strategy
-- `frontend/.env`: shared/default value (used by deploy/build pipelines)
-- `frontend/.env.local`: machine-specific override for local development (git-ignored)
-- Vite automatically prioritizes `.env.local` over `.env`
+> `.env.local` is git-ignored and takes priority over `.env` in Vite.
 
-### One-Command Startup (Windows)
+### One-Command Start (Windows)
+
 ```powershell
 ./start-all.ps1
 ```
 
-Access the UI at `http://localhost:5173`.
+---
 
-## Using the App
-1. Open the **Transcribe** page and click **Start Recording** (or demo mode) to capture speech.
-2. Watch transcripts update in real time while AI-generated keywords populate the sidebar.
-3. Hover over keywords for definitions, or add/remove keywords manually from highlighted text.
-4. Save transcripts for later review; saved transcripts and keywords are stored in browser `localStorage`.
-5. Open **Revision Mode** (`/revision`) to generate flashcards/MCQs from saved transcripts and view progress.
+## User Flow
 
-## Testing
-- Python keyword service smoke test: `python test_backend.py`
-- Health check endpoint: `curl http://localhost:5002/api/health`
+1. **Record or Upload** — Go to `/transcribe`, choose *Live Recording* or *Upload File*, select lecture language (English / Vietnamese)
+2. **Transcribe** — Live text appears in real time; AI corrects each chunk automatically if *AI Auto-correct* is enabled
+3. **Review Keywords** — GPT-extracted keywords populate the sidebar automatically; add extra keywords manually by double-clicking or selecting text
+4. **Save** — Enter a course/subject name and click *Save lecture*. The backend auto-generates a summary and keyword definitions in the background
+5. **Transcripts** — Browse, view, and edit saved transcripts and summaries at `/transcripts`
+6. **Keywords** — Review keyword groups per transcript at `/keywords`
+7. **Revision** — Generate flashcards or MCQ quizzes at `/revision`; track accuracy and streaks
+8. **Ask Kiki** — Click the 🐒 FAB on any page to open an AI chat. On the Transcripts page, Kiki loads your lecture content as context
+
+---
+
+## Project Structure
+
+```
+.
+├── backend/
+│   ├── src/
+│   │   ├── controllers/   # Business logic (content, transcribe, user, chat)
+│   │   ├── models/        # Mongoose schemas
+│   │   ├── routes/        # Express routers
+│   │   ├── middleware/    # JWT auth
+│   │   ├── services/      # summaryService (GPT)
+│   │   └── server.js      # Entry point + /api/analyze proxy
+│   └── .env.example
+└── frontend/
+    ├── src/
+    │   ├── pages/         # Transcribe, Transcripts, Keywords, Revision, Home, Profile
+    │   ├── components/    # Sidebar, MonkeyChat, Mascot, UI primitives
+    │   ├── context/       # AuthContext, LanguageContext
+    │   ├── api/           # Typed API client
+    │   └── i18n/          # en.js, vi.js locale files
+    └── .env
+```
+
+---
+
+## API Reference (key endpoints)
+
+| Method | Path | Description |
+|---|---|---|
+| POST | `/api/auth/signup` | Register |
+| POST | `/api/auth/signin` | Login → JWT |
+| GET | `/api/users/me` | Current user |
+| PUT | `/api/users/me` | Update display name / date of birth |
+| PUT | `/api/users/me/password` | Change password |
+| POST | `/api/content/transcripts` | Save transcript (triggers summary + keywords async) |
+| GET | `/api/content/transcripts` | List transcripts |
+| POST | `/api/transcribe/upload` | Whisper file transcription |
+| POST | `/api/transcribe/correct` | GPT text correction |
+| POST | `/api/chat/stream` | Kiki SSE chat stream |
+| POST | `/api/analyze` | Proxy to keyword analysis service |
+
+---
 
 ## Troubleshooting
-- Ensure Chrome, Edge, or Safari has microphone permissions enabled for speech capture.
-- If keywords are missing, confirm the Python service is running on port 5002 and the transcript exceeds roughly 50 characters.
-- When deploying, set `PYTHON_BACKEND_URL` in the Node backend so `/api/analyze` can reach the Flask service.
+
+- **Microphone not working** — Ensure Chrome or Edge has microphone permission; Firefox does not support the Web Speech API
+- **Keywords not appearing** — Check that `OPENAI_API_KEY` is set correctly in backend `.env`
+- **Summary shows "Generating…"** — Summary is generated asynchronously after save; refresh the Transcripts page after a few seconds
+
+---
 
 ## License
+
 Released under the MIT license.

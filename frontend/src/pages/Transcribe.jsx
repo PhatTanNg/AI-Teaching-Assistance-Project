@@ -346,26 +346,10 @@ const Transcribe = () => {
     if (word) setSelectedText(word);
   };
 
-  const fetchKeywordDefinition = useCallback(async (word) => {
-    try {
-      let res = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(word)}`);
-      if (!res.ok) {
-        const titled = word.charAt(0).toUpperCase() + word.slice(1);
-        res = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(titled)}`);
-        if (!res.ok) return '';
-      }
-      const data    = await res.json();
-      const extract = data.extract || '';
-      return extract.substring(0, 150) + (extract.length > 150 ? '…' : '');
-    } catch { return ''; }
-  }, []);
-
-  const addKeyword = async () => {
+  const addKeyword = () => {
     if (!selectedText || keywords.find(k => k.text === selectedText)) return;
     const clean = selectedText.trim();
-    let explanation = '';
-    if (clean.length > 2) explanation = await fetchKeywordDefinition(clean);
-    setKeywords(prev => [...prev, { text: clean, timestamp: Date.now(), explanation: explanation || undefined, source: 'manual' }]);
+    setKeywords(prev => [...prev, { text: clean, timestamp: Date.now(), source: 'manual' }]);
     setSelectedText('');
     window.getSelection()?.removeAllRanges();
   };

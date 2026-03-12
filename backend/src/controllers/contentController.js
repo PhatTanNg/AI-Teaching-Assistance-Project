@@ -95,25 +95,46 @@ export const createTranscript = async (req, res) => {
           }
         }
 
-        // Basic keyword extraction (simple frequency-based stub)
+        // GPT-based keyword extraction — only educational/technical terms, in the right language
         try {
-          const extractKeywords = (text, max = 12) => {
-            if (!text) return [];
-            const stopwords = new Set(['the','and','is','in','to','of','a','for','on','with','that','this','as','are','it','by','an']);
-            const words = text
-              .toLowerCase()
-              .replace(/[^a-z0-9\s]/g, ' ')
-              .split(/\s+/)
-              .filter(w => w.length > 2 && !stopwords.has(w));
-            const freq = {};
-            for (const w of words) freq[w] = (freq[w] || 0) + 1;
-            return Object.entries(freq)
-              .sort((a,b) => b[1]-a[1])
-              .slice(0, max)
-              .map(([keyword]) => ({ keywordText: keyword, definition: '' }));
+          const detectLang = (text) =>
+            /[àáảãạăắặẳẵâầấẩẫậđèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹ]/i.test(text) ? 'vi' : 'en';
+
+          const extractKeywordsWithGPT = async (text) => {
+            const apiKey = process.env.OPENAI_API_KEY;
+            if (!apiKey || !text) return [];
+            const lang = detectLang(text);
+            const langLabel = lang === 'vi' ? 'Vietnamese' : 'English';
+            try {
+              const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+                body: JSON.stringify({
+                  model: 'gpt-3.5-turbo',
+                  messages: [
+                    {
+                      role: 'system',
+                      content: `You are an educational assistant. Extract 3–8 subject-specific technical or academic keywords from the transcript that a student would benefit from having defined. Ignore common conversational words, names, greetings, and filler words regardless of language. Return ONLY valid JSON: [{"keyword":"...","definition":"..."}]. Definitions must be in ${langLabel}.`
+                    },
+                    { role: 'user', content: `Transcript:\n${text.substring(0, 4000)}` }
+                  ],
+                  temperature: 0.2,
+                  max_tokens: 600,
+                }),
+              });
+              if (!resp.ok) return [];
+              const data = await resp.json().catch(() => ({}));
+              const raw = data?.choices?.[0]?.message?.content?.trim() || '';
+              const first = raw.indexOf('['), last = raw.lastIndexOf(']');
+              if (first === -1 || last === -1) return [];
+              const parsed = JSON.parse(raw.slice(first, last + 1));
+              return Array.isArray(parsed)
+                ? parsed.filter(k => k?.keyword).map(k => ({ keywordText: k.keyword.trim(), definition: k.definition?.trim() || '' }))
+                : [];
+            } catch { return []; }
           };
 
-          const keywords = extractKeywords(summaryText || rawTranscript.trim(), 10);
+          const keywords = await extractKeywordsWithGPT(summaryText || rawTranscript.trim());
 
           const createdKeywordIds = [];
           for (const kw of keywords) {
@@ -369,19 +390,25 @@ export const createKeywords = async (req, res) => {
     ));
 
     // Helper: call OpenAI to generate definitions for a set of keywords using provided context
+    const detectLang = (text) =>
+      /[àáảãạăắặẳẵâầấẩẫậđèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹ]/i.test(text || '') ? 'vi' : 'en';
+
     const generateDefinitions = async (words, context) => {
       if (!words || words.length === 0) return {};
       const apiKey = process.env.OPENAI_API_KEY;
       if (!apiKey) return {};
 
+      const lang = detectLang(context);
+      const langLabel = lang === 'vi' ? 'Vietnamese' : 'English';
+
       const systemMsg = {
         role: 'system',
-        content: 'You are a concise assistant that produces one-sentence definitions for technical or educational keywords. Return only valid JSON in the form [{"keyword":"...","definition":"..."}, ...] with no extra commentary.'
+        content: `You are a concise educational assistant. Produce one-sentence definitions for technical or educational keywords. Definitions must be in ${langLabel}. Return only valid JSON in the form [{"keyword":"...","definition":"..."}, ...] with no extra commentary.`
       };
 
       const userMsg = {
         role: 'user',
-        content: `Provide a short (one-sentence) definition for each of the following keywords: ${JSON.stringify(words)}.\n\nContext: ${context ? context.substring(0, 4000) : 'none'}.\n\nReturn output as valid JSON array only.`
+        content: `Provide a short (one-sentence) definition in ${langLabel} for each of the following keywords: ${JSON.stringify(words)}.\n\nContext: ${context ? context.substring(0, 4000) : 'none'}.\n\nReturn output as valid JSON array only.`
       };
 
       try {
