@@ -95,7 +95,6 @@ export default function MonkeyChat() {
       lecturesFetchRef.current = getTranscripts(token)
         .then(data => {
           const result = Array.isArray(data) ? data : [];
-          console.log('[MonkeyChat] Loaded', result.length, 'transcripts');
           setLectures(result);
           return result;
         })
@@ -181,7 +180,6 @@ export default function MonkeyChat() {
 
       const apiMessages = history.map(m => ({ role: m.role, content: m.content }));
       const chatCtx = buildChatContext();
-      console.log('[MonkeyChat] context type:', chatCtx ? Object.keys(chatCtx).join(',') : 'none');
       const res = await streamChat(token, apiMessages, chatCtx ?? {});
 
       if (!res.ok) throw new Error('Stream request failed');

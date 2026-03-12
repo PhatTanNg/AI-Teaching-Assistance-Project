@@ -89,12 +89,6 @@ export default function RevisionModePage() {
       const payload = await apiRequest('/revision/mcq/generate', {
         method: 'POST', body: { student_id: studentId, transcript_ids: selectedIds, count, difficulty },
       });
-      // Debug: inspect the raw API response shape
-      console.log('[REVISION] MCQ RAW RESPONSE:', JSON.stringify(payload, null, 2));
-      console.log('[REVISION] questions count:', payload.questions?.length);
-      if (payload.questions?.[0]) {
-        console.log('[REVISION] first question sample:', JSON.stringify(payload.questions[0], null, 2));
-      }
       setMcqs(payload.questions || []);
       loaderRef.current?.complete();
       await loadProgress();
