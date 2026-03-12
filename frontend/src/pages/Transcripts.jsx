@@ -17,11 +17,13 @@ import {
 } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
+import { useChatContext } from '../context/ChatContext';
 
 const Transcripts = () => {
   const { token } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const { setLectureContext } = useChatContext();
 
   const [transcripts, setTranscripts] = useState([]);
   const [selectedTranscript, setSelectedTranscript] = useState(null);
@@ -64,7 +66,8 @@ const Transcripts = () => {
     if (!tr?._id) { setError('Invalid transcript'); return; }
     setSelectedTranscript(tr);
     setIsDialogOpen(true);
-  }, []);
+    setLectureContext({ transcript: tr.rawTranscript, summary: tr.summary, topic: tr.subject });
+  }, [setLectureContext]);
 
   const startEdit = (field, text) => { setEditingField(field); setEditingText(text); };
   const cancelEdit = () => { setEditingField(null); setEditingText(''); };
@@ -172,7 +175,7 @@ const Transcripts = () => {
       )}
 
       {/* Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) setLectureContext(null); }}>
         <DialogContent style={{
           maxWidth: '900px', maxHeight: '80vh', overflowY: 'auto',
           position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%, -50%)',

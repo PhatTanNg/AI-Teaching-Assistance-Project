@@ -6,6 +6,7 @@ import App from './App.jsx';
 import './index.css';
 import { AuthProvider } from './context/AuthContext.jsx';
 import { LanguageProvider } from './context/LanguageContext.jsx';
+import { ChatProvider } from './context/ChatContext.jsx';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
@@ -13,7 +14,9 @@ ReactDOM.createRoot(document.getElementById('root')).render(
       <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
         <LanguageProvider>
           <AuthProvider>
-            <App />
+            <ChatProvider>
+              <App />
+            </ChatProvider>
           </AuthProvider>
         </LanguageProvider>
       </ThemeProvider>

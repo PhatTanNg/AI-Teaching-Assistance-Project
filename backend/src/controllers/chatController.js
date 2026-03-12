@@ -8,17 +8,21 @@ const SYSTEM_PROMPT = `You are Kiki 🐒, a helpful study monkey and AI tutor fo
 If lecture content is provided, use it to give specific, grounded answers rather than generic ones.`;
 
 const buildMessages = ({ messages, context }) => {
-  const systemContent = context
-    ? `${SYSTEM_PROMPT}\n\n--- LECTURE CONTEXT ---\n${
-        context.transcript ? `Transcript:\n${context.transcript.slice(0, 3000)}\n` : ''
-      }${
-        context.summary ? `Summary:\n${context.summary.slice(0, 1000)}\n` : ''
-      }${
-        context.topic ? `Topic: ${context.topic}\n` : ''
-      }--- END CONTEXT ---`
-    : SYSTEM_PROMPT;
+  let contextBlock = '';
 
-  return [{ role: 'system', content: systemContent }, ...messages];
+  if (context?.transcript || context?.summary) {
+    // Single-lecture mode — full transcript/summary for the open lecture
+    contextBlock = `\n\n--- LECTURE CONTEXT ---\n${
+      context.transcript ? `Transcript:\n${context.transcript.slice(0, 3000)}\n` : ''
+    }${context.summary ? `Summary:\n${context.summary.slice(0, 1000)}\n` : ''
+    }${context.topic ? `Topic: ${context.topic}\n` : ''
+    }--- END CONTEXT ---`;
+  } else if (context?.allLectures) {
+    // Library mode — compact index of all saved lectures (subject + date + summary)
+    contextBlock = `\n\n--- LECTURE LIBRARY ---\n${context.allLectures}\n--- END LIBRARY ---\nSử dụng thư viện trên để trả lời câu hỏi về bất kỳ bài giảng nào. Bài [1] là bài gần nhất.`;
+  }
+
+  return [{ role: 'system', content: SYSTEM_PROMPT + contextBlock }, ...messages];
 };
 
 export const chatStreamHandler = async (req, res) => {

@@ -2,29 +2,63 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { X, Send, ChevronDown } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useLanguage } from '../context/LanguageContext.jsx';
-import { streamChat } from '../api/client.js';
+import { useChatContext } from '../context/ChatContext.jsx';
+import { streamChat, getTranscripts } from '../api/client.js';
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5001';
-
-export default function MonkeyChat({ context = null }) {
+export default function MonkeyChat() {
   const { token } = useAuth();
   const { t } = useLanguage();
+  const { lectureContext } = useChatContext();
 
-  const [isOpen, setIsOpen]         = useState(false);
-  const [messages, setMessages]     = useState([]);
-  const [input, setInput]           = useState('');
-  const [isStreaming, setIsStreaming] = useState(false);
+  const [isOpen, setIsOpen]           = useState(false);
+  const [messages, setMessages]       = useState([]);
+  const [input, setInput]             = useState('');
+  const [isStreaming, setIsStreaming]  = useState(false);
+  const [lectures, setLectures]       = useState(null); // null = not fetched yet
 
   const messagesEndRef = useRef(null);
   const inputRef       = useRef(null);
   const abortRef       = useRef(null);
 
+  // Fetch all transcripts on first open (library mode)
+  const toggleOpen = useCallback(() => {
+    const opening = !isOpen;
+    setIsOpen(opening);
+    if (opening && token && lectures === null) {
+      getTranscripts(token)
+        .then(data => setLectures(data || []))
+        .catch(() => setLectures([]));
+    }
+  }, [isOpen, token, lectures]);
+
+  // Build compact lecture library string
+  const buildLibraryContext = useCallback(() => {
+    if (!lectures?.length) return null;
+    const library = lectures
+      .slice()
+      .sort((a, b) => new Date(b.transcribedAt) - new Date(a.transcribedAt))
+      .map((tr, i) => {
+        const date = new Date(tr.transcribedAt).toLocaleDateString('vi-VN');
+        return `[${i + 1}] "${tr.subject}" — ${date}\n${tr.summary ? `Tóm tắt: ${tr.summary.slice(0, 400)}` : '(chưa có tóm tắt)'}`;
+      })
+      .join('\n\n');
+    return { allLectures: library };
+  }, [lectures]);
+
+  // Priority: single-lecture from ChatContext > library > null
+  const buildChatContext = useCallback(() => {
+    if (lectureContext) return lectureContext;
+    return buildLibraryContext();
+  }, [lectureContext, buildLibraryContext]);
+
   // Greeting on first open
   useEffect(() => {
     if (isOpen && messages.length === 0) {
-      const greeting = context
-        ? t('chat.contextLoaded')
-        : t('chat.greeting');
+      const greeting = lectureContext?.topic
+        ? `Đã tải bài: **${lectureContext.topic}** 📖 Hỏi mình bất cứ điều gì về bài này nhé!`
+        : lectures?.length
+          ? `Hey! Mình là Kiki 🐒 Mình có ${lectures.length} bài giảng của bạn. Hỏi mình về bất kỳ bài nào nhé!`
+          : t('chat.greeting');
       setMessages([{ role: 'assistant', content: greeting }]);
     }
   }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -37,12 +71,18 @@ export default function MonkeyChat({ context = null }) {
     if (isOpen) inputRef.current?.focus();
   }, [isOpen]);
 
-  // Reset messages when context changes (new lecture opened)
+  // Reset messages when a specific lecture is opened/closed
   useEffect(() => {
-    if (context) {
-      setMessages([{ role: 'assistant', content: t('chat.contextLoaded') }]);
+    if (!isOpen) return;
+    if (lectureContext) {
+      setMessages([{ role: 'assistant', content: `Đã tải bài: **${lectureContext.topic || 'bài giảng'}** 📖 Hỏi mình bất cứ điều gì về bài này nhé!` }]);
+    } else if (messages.length > 0 && messages[0]?.content?.startsWith('Đã tải bài:')) {
+      const greeting = lectures?.length
+        ? `Hey! Mình là Kiki 🐒 Mình có ${lectures.length} bài giảng của bạn. Hỏi mình về bất kỳ bài nào nhé!`
+        : t('chat.greeting');
+      setMessages([{ role: 'assistant', content: greeting }]);
     }
-  }, [context]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [lectureContext]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sendMessage = useCallback(async () => {
     const text = input.trim();
@@ -54,12 +94,12 @@ export default function MonkeyChat({ context = null }) {
     setInput('');
     setIsStreaming(true);
 
-    // Placeholder for streaming response
     setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
 
     try {
       const apiMessages = history.map(m => ({ role: m.role, content: m.content }));
-      const res = await streamChat(token, apiMessages, context ?? {});
+      const chatCtx = buildChatContext();
+      const res = await streamChat(token, apiMessages, chatCtx ?? {});
 
       if (!res.ok) throw new Error('Stream request failed');
 
@@ -114,7 +154,7 @@ export default function MonkeyChat({ context = null }) {
       setIsStreaming(false);
       abortRef.current = null;
     }
-  }, [input, isStreaming, messages, token, context]);
+  }, [input, isStreaming, messages, token, buildChatContext]);
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
@@ -125,7 +165,7 @@ export default function MonkeyChat({ context = null }) {
       {/* ── FAB button ── */}
       <button
         type="button"
-        onClick={() => setIsOpen(v => !v)}
+        onClick={toggleOpen}
         aria-label={isOpen ? 'Close chat' : 'Open Kiki AI chat'}
         style={{
           position: 'fixed',
@@ -135,15 +175,17 @@ export default function MonkeyChat({ context = null }) {
           width: '52px',
           height: '52px',
           borderRadius: '50%',
-          background: 'var(--accent-primary)',
+          background: lectureContext ? 'var(--accent-purple)' : 'var(--accent-primary)',
           border: 'none',
           cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           fontSize: '1.5rem',
-          boxShadow: '0 4px 20px rgba(110,231,247,0.4)',
-          transition: 'transform 0.2s, box-shadow 0.2s',
+          boxShadow: lectureContext
+            ? '0 4px 20px rgba(167,139,250,0.4)'
+            : '0 4px 20px rgba(110,231,247,0.4)',
+          transition: 'transform 0.2s, box-shadow 0.2s, background 0.2s',
         }}
         onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.08)'; }}
         onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; }}
@@ -182,9 +224,27 @@ export default function MonkeyChat({ context = null }) {
             justifyContent: 'space-between',
             flexShrink: 0,
           }}>
-            <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>
-              {t('chat.title')}
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0 }}>
+              <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)', flexShrink: 0 }}>
+                {t('chat.title')}
+              </span>
+              {lectureContext?.topic && (
+                <span style={{
+                  fontSize: '0.7rem',
+                  padding: '0.1rem 0.5rem',
+                  borderRadius: '999px',
+                  background: 'rgba(167,139,250,0.15)',
+                  color: 'var(--accent-purple)',
+                  fontWeight: 500,
+                  maxWidth: '140px',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}>
+                  📖 {lectureContext.topic}
+                </span>
+              )}
+            </div>
             <button type="button" onClick={() => setIsOpen(false)}
               style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '0.25rem', display: 'flex' }}
               aria-label="Close">
