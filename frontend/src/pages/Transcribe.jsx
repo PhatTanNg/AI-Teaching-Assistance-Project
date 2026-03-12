@@ -84,7 +84,6 @@ const Transcribe = () => {
 
   useEffect(() => { tokenRef.current = token; }, [token]);
   useEffect(() => { autoCorrectRef.current = autoCorrect; }, [autoCorrect]);
-  useEffect(() => { isRecordingRef.current = isRecording; }, [isRecording]);
 
   const [isRecording, setIsRecording]                 = useState(false);
   const [rawTranscript, setRawTranscript]             = useState('');
@@ -101,6 +100,7 @@ const Transcribe = () => {
   const demoIntervalRef   = useRef(null);
   const analysisTimerRef  = useRef(null);
   const isRecordingRef    = useRef(false);
+  useEffect(() => { isRecordingRef.current = isRecording; }, [isRecording]);
   const [isRealtimeStreaming] = useState(false);
 
   const [subject, setSubject]                       = useState('');
