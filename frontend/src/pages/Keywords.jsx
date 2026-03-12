@@ -14,9 +14,11 @@ import {
   addKeywordToGroup,
 } from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 
 const Keywords = () => {
   const { token } = useAuth();
+  const { t } = useLanguage();
 
   const [transcripts, setTranscripts] = useState([]);
   const [selectedTranscript, setSelectedTranscript] = useState('');
@@ -137,7 +139,7 @@ const Keywords = () => {
     return (
       <div className="page-state">
         <div className="spinner" />
-        <p>Loading keywords…</p>
+        <p>{t('common.loading')}</p>
       </div>
     );
   }
@@ -145,7 +147,7 @@ const Keywords = () => {
   return (
     <div className="page" style={{ width: '100%', maxWidth: '100%' }}>
       <div style={{ marginBottom: '1.5rem' }}>
-        <h1>Manage Keywords</h1>
+        <h1>{t('keywords.title')}</h1>
         <p className="card__subtitle">Edit keyword definitions for your lectures</p>
       </div>
 
@@ -163,14 +165,14 @@ const Keywords = () => {
 
       {/* Transcript Selector */}
       <div className="card" style={{ marginBottom: '1.5rem' }}>
-        <Label className="form-label">Select Transcript</Label>
+        <Label className="form-label">{t('keywords.selectTranscript')}</Label>
         <select
           value={selectedTranscript}
           onChange={(e) => setSelectedTranscript(e.target.value)}
           className="form-input"
           style={{ appearance: 'auto' }}
         >
-          <option value="">-- Select a transcript --</option>
+          <option value="">-- {t('keywords.selectTranscript')} --</option>
           {transcripts.map(transcript => (
             <option key={transcript._id} value={transcript._id}>
               {transcript.subject} — {new Date(transcript.transcribedAt).toLocaleDateString()}
@@ -185,14 +187,14 @@ const Keywords = () => {
           <div className="card" style={{ marginBottom: '1.5rem' }}>
             <div style={{ position: 'relative' }}>
               <Search style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', width: '1rem', height: '1rem', color: 'var(--text-muted)' }} />
-              <Input placeholder="Search keywords…" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+              <Input placeholder={t('keywords.search')} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
                 className="form-input" style={{ paddingLeft: '2.5rem' }} />
             </div>
           </div>
 
           {/* Add New Keyword */}
           <div className="card" style={{ marginBottom: '1.5rem' }}>
-            <h3 style={{ marginBottom: '1rem', fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-primary)' }}>Add New Keyword</h3>
+            <h3 style={{ marginBottom: '1rem', fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-primary)' }}>{t('keywords.addKeyword')}</h3>
             <div style={{ display: 'grid', gap: '1rem' }}>
               <div>
                 <Label className="form-label">Keyword Text</Label>
@@ -205,7 +207,7 @@ const Keywords = () => {
                   className="neon-textarea" style={{ minHeight: '100px' }} />
               </div>
               <Button onClick={handleAddKeyword} className="btn" style={{ alignSelf: 'flex-start' }}>
-                <Plus size={16} /> Add Keyword
+                <Plus size={16} /> {t('keywords.addKeyword')}
               </Button>
             </div>
           </div>
@@ -227,12 +229,10 @@ const Keywords = () => {
                   <rect x="22" y="52" width="26" height="6" rx="3" fill="rgba(167,139,250,0.15)"/>
                 </svg>
                 <div className="empty-state__title">
-                  {searchTerm ? 'No matches found' : 'No keywords yet'}
+                  {searchTerm ? t('common.error') : t('keywords.emptyTitle')}
                 </div>
                 <p className="empty-state__desc">
-                  {searchTerm
-                    ? `Try a different search term`
-                    : 'Keywords appear after you save a transcript — or add them manually below 👇'}
+                  {searchTerm ? `Try a different search term` : t('keywords.emptyDesc')}
                 </p>
               </div>
             ) : (

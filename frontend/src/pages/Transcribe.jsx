@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mic, Square, Save, Trash2, Highlighter, Play, RefreshCw } from 'lucide-react';
+import { Mic, Square, Save, Trash2, Highlighter, Play, RefreshCw, Upload, Sparkles, X } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Alert, AlertDescription } from '../components/ui/alert';
-import { createTranscript, createKeywords } from '../api/client';
+import { createTranscript, createKeywords, transcribeFile, correctTranscript } from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 
 // Demo lecture data with keywords
 const DEMO_LECTURE = [
@@ -48,57 +49,111 @@ const DEMO_LECTURE = [
   { word: "polymorphism.", isKeyword: true, explanation: "The ability of different objects to respond to the same method call in their own way." },
 ];
 
+const LANG_LOCALES = { vi: 'vi-VN', en: 'en-IE' };
+const LANG_LABELS  = { vi: '🇻🇳 Tiếng Việt', en: '🇬🇧 English' };
+
 const Transcribe = () => {
   const navigate = useNavigate();
   const { token } = useAuth();
+  const { t } = useLanguage();
 
-  const [isRecording, setIsRecording] = useState(false);
-  const [rawTranscript, setRawTranscript] = useState('');
-  const [editedTranscript, setEditedTranscript] = useState('');
-  const [keywords, setKeywords] = useState([]);
-  const [selectedText, setSelectedText] = useState('');
-  const [browserSupported, setBrowserSupported] = useState(true);
-  const [demoMode, setDemoMode] = useState(false);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [lastAnalyzedLength, setLastAnalyzedLength] = useState(0);
-  const [hoveredKeyword, setHoveredKeyword] = useState(null);
+  // Input mode + language
+  const [inputMode, setInputMode]       = useState('live'); // 'live' | 'upload'
+  const [transcribeLang, setTranscribeLang] = useState('vi');
+  const [autoCorrect, setAutoCorrect]   = useState(true);
 
-  const recognitionRef = useRef(null);
-  const demoIntervalRef = useRef(null);
-  const analysisTimerRef = useRef(null);
-  const [isRealtimeStreaming, setIsRealtimeStreaming] = useState(false);
+  // Upload mode
+  const [uploadFile, setUploadFile]             = useState(null);
+  const [isTranscribingFile, setIsTranscribingFile] = useState(false);
 
-  const [subject, setSubject] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveError, setSaveError] = useState('');
-  const [isSummarizing, setIsSummarizing] = useState(false);
+  // AI correction diff (post-transcription)
+  const [correctionDiff, setCorrectionDiff]     = useState(null); // { original, corrected }
+  const [isCorrectingFull, setIsCorrectingFull] = useState(false);
+
+  // Real-time 3-layer transcript state
+  const [correctedText, setCorrectedText]   = useState('');
+  const [pendingChunks, setPendingChunks]   = useState([]); // [{id, raw}]
+  const [interimText, setInterimText]       = useState('');
+
+  // Refs for use inside async callbacks (avoids stale closures)
+  const tokenRef          = useRef(token);
+  const autoCorrectRef    = useRef(autoCorrect);
+  const correctedTextRef  = useRef('');
+  const pendingChunksRef  = useRef([]);
+  const chunkIdRef        = useRef(0);
+
+  useEffect(() => { tokenRef.current = token; }, [token]);
+  useEffect(() => { autoCorrectRef.current = autoCorrect; }, [autoCorrect]);
+
+  const [isRecording, setIsRecording]                 = useState(false);
+  const [rawTranscript, setRawTranscript]             = useState('');
+  const [editedTranscript, setEditedTranscript]       = useState('');
+  const [keywords, setKeywords]                       = useState([]);
+  const [selectedText, setSelectedText]               = useState('');
+  const [browserSupported, setBrowserSupported]       = useState(true);
+  const [demoMode, setDemoMode]                       = useState(false);
+  const [isAnalyzing, setIsAnalyzing]                 = useState(false);
+  const [lastAnalyzedLength, setLastAnalyzedLength]   = useState(0);
+  const [hoveredKeyword, setHoveredKeyword]           = useState(null);
+
+  const recognitionRef    = useRef(null);
+  const demoIntervalRef   = useRef(null);
+  const analysisTimerRef  = useRef(null);
+  const [isRealtimeStreaming] = useState(false);
+
+  const [subject, setSubject]                       = useState('');
+  const [isSaving, setIsSaving]                     = useState(false);
+  const [saveError, setSaveError]                   = useState('');
+  const [isSummarizing]                             = useState(false);
   const [transcriptionStopped, setTranscriptionStopped] = useState(false);
 
   const ANALYSIS_API = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001').replace(/\/$/, '') + '/api/analyze';
 
-  /* ── Speech recognition ── */
+  /* ── Speech recognition setup (re-runs only when language changes) ── */
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) { setBrowserSupported(false); return; }
 
     const recognition = new SpeechRecognition();
-    recognition.continuous = true;
+    recognition.continuous    = true;
     recognition.interimResults = true;
-    recognition.lang = 'en-US';
+    recognition.lang          = LANG_LOCALES[transcribeLang] || 'vi-VN';
 
     recognition.onresult = (event) => {
-      let interimTranscript = '';
-      let finalTranscript = '';
+      let finalChunk = '';
+      let interim    = '';
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const piece = event.results[i][0].transcript;
-        if (event.results[i].isFinal) finalTranscript += piece + ' ';
-        else interimTranscript += piece;
+        if (event.results[i].isFinal) finalChunk += piece + ' ';
+        else interim += piece;
       }
-      setRawTranscript(prev => {
-        const cleaned = prev.replace(/\s*\|.*\|$/, '');
-        if (finalTranscript) return cleaned + finalTranscript;
-        return cleaned + (interimTranscript ? ' |' + interimTranscript + '|' : '');
-      });
+
+      setInterimText(interim);
+
+      if (finalChunk.trim()) {
+        const id  = ++chunkIdRef.current;
+        const raw = finalChunk;
+
+        // Show raw in pending immediately
+        pendingChunksRef.current = [...pendingChunksRef.current, { id, raw }];
+        setPendingChunks([...pendingChunksRef.current]);
+        setRawTranscript(prev => prev + raw);
+
+        const removePending = (text) => {
+          correctedTextRef.current += text;
+          setCorrectedText(correctedTextRef.current);
+          pendingChunksRef.current = pendingChunksRef.current.filter(c => c.id !== id);
+          setPendingChunks([...pendingChunksRef.current]);
+        };
+
+        if (autoCorrectRef.current && raw.trim().split(/\s+/).length >= 5) {
+          correctTranscript(tokenRef.current, raw.trim(), transcribeLang)
+            .then(({ corrected }) => removePending(corrected + ' '))
+            .catch(() => removePending(raw));
+        } else {
+          removePending(raw);
+        }
+      }
     };
 
     recognition.onerror = (event) => {
@@ -109,7 +164,7 @@ const Transcribe = () => {
 
     recognitionRef.current = recognition;
     return () => { recognition.stop(); };
-  }, []);
+  }, [transcribeLang]); // intentionally excludes token + autoCorrect — use refs instead
 
   /* ── Demo mode ── */
   useEffect(() => {
@@ -194,26 +249,97 @@ const Transcribe = () => {
     return () => { if (analysisTimerRef.current) clearTimeout(analysisTimerRef.current); };
   }, [rawTranscript, lastAnalyzedLength, analyzeTranscript, isRecording, demoMode]);
 
+  /* ── Recording controls ── */
   const startRecording = () => {
-    if (recognitionRef.current) { recognitionRef.current.start(); setIsRecording(true); setTranscriptionStopped(false); }
+    if (recognitionRef.current) {
+      recognitionRef.current.start();
+      setIsRecording(true);
+      setTranscriptionStopped(false);
+    }
   };
+
   const stopRecording = () => {
-    if (demoMode) { setDemoMode(false); if (demoIntervalRef.current) clearInterval(demoIntervalRef.current); }
-    else if (recognitionRef.current) recognitionRef.current.stop();
+    if (demoMode) {
+      setDemoMode(false);
+      if (demoIntervalRef.current) clearInterval(demoIntervalRef.current);
+    } else if (recognitionRef.current) {
+      recognitionRef.current.stop();
+    }
     setIsRecording(false);
     setTranscriptionStopped(true);
-    setEditedTranscript(rawTranscript.replace(/\|/g, '').trim());
+    setInterimText('');
+
+    // Flush remaining pending chunks as raw (no correction)
+    const pendingRaw = pendingChunksRef.current.map(c => c.raw).join('');
+    const full = (correctedTextRef.current + pendingRaw).trim();
+    correctedTextRef.current = full;
+    setCorrectedText(full);
+    setEditedTranscript(full);
+    pendingChunksRef.current = [];
+    setPendingChunks([]);
   };
+
   const startDemo = () => { if (!isRecording && !isRealtimeStreaming) setDemoMode(true); };
 
+  /* ── Upload file handlers ── */
+  const handleFileDrop = (e) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files?.[0];
+    if (file) setUploadFile(file);
+  };
+
+  const handleTranscribeFile = async () => {
+    if (!uploadFile) return;
+    setIsTranscribingFile(true);
+    setSaveError('');
+    try {
+      const { transcript } = await transcribeFile(token, uploadFile, transcribeLang);
+      setRawTranscript(transcript);
+      setEditedTranscript(transcript);
+      correctedTextRef.current = transcript;
+      setCorrectedText(transcript);
+      setTranscriptionStopped(true);
+      // Auto-analyze after upload transcription
+      analyzeTranscript(transcript);
+    } catch (err) {
+      setSaveError(err.message || 'Transcription failed');
+    } finally {
+      setIsTranscribingFile(false);
+    }
+  };
+
+  /* ── Full AI correction (post-transcription) ── */
+  const runFullCorrection = async () => {
+    if (!editedTranscript) return;
+    setIsCorrectingFull(true);
+    try {
+      const { corrected } = await correctTranscript(token, editedTranscript, transcribeLang);
+      if (corrected && corrected !== editedTranscript) {
+        setCorrectionDiff({ original: editedTranscript, corrected });
+      }
+    } catch (err) {
+      console.error('AI correction failed:', err);
+    } finally {
+      setIsCorrectingFull(false);
+    }
+  };
+
+  const acceptCorrection = () => {
+    if (!correctionDiff) return;
+    setEditedTranscript(correctionDiff.corrected);
+    setCorrectionDiff(null);
+  };
+
+  /* ── Text selection / keyword ── */
   const handleTextSelection = () => {
     const sel = window.getSelection()?.toString().trim();
     if (sel) setSelectedText(sel);
   };
+
   const handleTextareaDoubleClick = (e) => {
     const text = editedTranscript;
-    const pos = e.target.selectionStart;
-    let start = pos, end = pos;
+    const pos  = e.target.selectionStart;
+    let start  = pos, end = pos;
     while (start > 0 && /\w/.test(text[start - 1])) start--;
     while (end < text.length && /\w/.test(text[end])) end++;
     const word = text.substring(start, end).trim();
@@ -228,7 +354,7 @@ const Transcribe = () => {
         res = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(titled)}`);
         if (!res.ok) return '';
       }
-      const data = await res.json();
+      const data    = await res.json();
       const extract = data.extract || '';
       return extract.substring(0, 150) + (extract.length > 150 ? '…' : '');
     } catch { return ''; }
@@ -243,6 +369,7 @@ const Transcribe = () => {
     setSelectedText('');
     window.getSelection()?.removeAllRanges();
   };
+
   const removeKeyword = (kw) => setKeywords(prev => prev.filter(k => k.text !== kw));
 
   /* ── Highlight keywords in displayed text ── */
@@ -253,7 +380,7 @@ const Transcribe = () => {
       const newParts = [];
       parts.forEach(part => {
         if (part.isKeyword) { newParts.push(part); return; }
-        const regex = new RegExp(`\\b(${keyword.text})\\b`, 'gi');
+        const regex   = new RegExp(`\\b(${keyword.text})\\b`, 'gi');
         const matches = [...part.text.matchAll(regex)];
         if (!matches.length) { newParts.push(part); return; }
         let last = 0;
@@ -282,8 +409,8 @@ const Transcribe = () => {
         try {
           const kwData = keywords.map(kw => ({
             keywordText: typeof kw === 'string' ? kw : kw.keywordText || kw.word || kw.text,
-            definition: kw.definition || kw.explanation || '',
-            source: kw.source || 'manual',
+            definition:  kw.definition || kw.explanation || '',
+            source:      kw.source || 'manual',
           }));
           await createKeywords(token, { sessionId: transcriptData.sessionId, keywords: kwData });
         } catch (kwErr) {
@@ -310,6 +437,10 @@ const Transcribe = () => {
     if (!confirm('Clear this transcript?')) return;
     setRawTranscript(''); setEditedTranscript(''); setKeywords([]); setSubject('');
     setLastAnalyzedLength(0); setHoveredKeyword(null); setIsAnalyzing(false); setTranscriptionStopped(false);
+    correctedTextRef.current = '';
+    setCorrectedText(''); setPendingChunks([]); setInterimText('');
+    setCorrectionDiff(null); setUploadFile(null);
+    pendingChunksRef.current = [];
     if (analysisTimerRef.current) { clearTimeout(analysisTimerRef.current); analysisTimerRef.current = null; }
   };
 
@@ -343,17 +474,19 @@ const Transcribe = () => {
     return (
       <div className="page-state">
         <Alert variant="destructive">
-          <AlertDescription>Your browser doesn't support speech recognition. Please use Chrome, Edge, or Safari.</AlertDescription>
+          <AlertDescription>{t('transcribe.browserNotSupported')}</AlertDescription>
         </Alert>
       </div>
     );
   }
 
+  const hasEnoughForCorrection = editedTranscript.split(/\s+/).filter(Boolean).length >= 50;
+
   return (
     <div className="page" style={{ width: '100%', maxWidth: '100%' }}>
       {/* Header */}
       <div style={{ marginBottom: '1.5rem' }}>
-        <h1>AI-Assisted Live Transcription</h1>
+        <h1>{t('transcribe.title')}</h1>
         <p className="card__subtitle">Capture lectures, highlight keywords, and auto-generate summaries</p>
       </div>
 
@@ -364,14 +497,62 @@ const Transcribe = () => {
       )}
 
       {/* Subject */}
-      <div className="card" style={{ marginBottom: '1.5rem' }}>
-        <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
-          <div>
-            <Label className="form-label">Subject / Course Name *</Label>
-            <Input placeholder="e.g., Machine Learning 101" value={subject}
-              onChange={(e) => setSubject(e.target.value)} disabled={isRecording || isRealtimeStreaming}
-              className="form-input" />
+      <div className="card" style={{ marginBottom: '1rem' }}>
+        <div>
+          <Label className="form-label">{t('transcribe.subjectLabel')} *</Label>
+          <Input placeholder={t('transcribe.subjectPlaceholder')} value={subject}
+            onChange={(e) => setSubject(e.target.value)}
+            disabled={isRecording || isRealtimeStreaming || isTranscribingFile}
+            className="form-input" style={{ maxWidth: '480px' }} />
+        </div>
+      </div>
+
+      {/* ── Settings bar: language + mode + autoCorrect ── */}
+      <div className="card" style={{ marginBottom: '1.5rem', padding: '0.75rem 1rem' }}>
+        <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          {/* Transcription language */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, whiteSpace: 'nowrap' }}>
+              {t('transcribe.langLabel')}:
+            </span>
+            {Object.entries(LANG_LABELS).map(([code, label]) => (
+              <button key={code} type="button"
+                className={`btn btn--sm${transcribeLang === code ? '' : ' btn--ghost'}`}
+                onClick={() => setTranscribeLang(code)}
+                disabled={isRecording || isTranscribingFile}>
+                {label}
+              </button>
+            ))}
           </div>
+
+          {/* Divider */}
+          <div style={{ width: '1px', height: '24px', background: 'var(--card-border)' }} />
+
+          {/* Input mode */}
+          <div style={{ display: 'flex', gap: '0.25rem' }}>
+            <button type="button"
+              className={`btn btn--sm${inputMode === 'live' ? '' : ' btn--ghost'}`}
+              onClick={() => setInputMode('live')} disabled={isRecording || isTranscribingFile}>
+              <Mic size={13} /> {t('transcribe.modeLive')}
+            </button>
+            <button type="button"
+              className={`btn btn--sm${inputMode === 'upload' ? '' : ' btn--ghost'}`}
+              onClick={() => setInputMode('upload')} disabled={isRecording || isTranscribingFile}>
+              <Upload size={13} /> {t('transcribe.modeUpload')}
+            </button>
+          </div>
+
+          {/* AutoCorrect toggle (live mode only) */}
+          {inputMode === 'live' && (
+            <>
+              <div style={{ width: '1px', height: '24px', background: 'var(--card-border)' }} />
+              <button type="button"
+                className={`btn btn--sm${autoCorrect ? '' : ' btn--ghost'}`}
+                onClick={() => setAutoCorrect(v => !v)} title="Toggle real-time AI correction">
+                <Sparkles size={13} /> {t('transcribe.autoCorrect')}
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -380,71 +561,177 @@ const Transcribe = () => {
         {/* Left – Transcription area */}
         <div className="card">
           <div style={{ display: 'grid', gap: '1rem' }}>
-            {/* Controls */}
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-              {!isRecording && !isRealtimeStreaming ? (
-                <>
-                  <Button onClick={startRecording} className="btn">
-                    <Mic size={16} /> Start Recording
+
+            {/* ── LIVE MODE ── */}
+            {inputMode === 'live' && (
+              <>
+                {/* Controls */}
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  {!isRecording && !isRealtimeStreaming ? (
+                    <>
+                      <Button onClick={startRecording} className="btn">
+                        <Mic size={16} /> {t('transcribe.startRecording')}
+                      </Button>
+                      <Button onClick={startDemo} className="btn btn--ghost">
+                        <Play size={16} /> {t('transcribe.demo')}
+                      </Button>
+                    </>
+                  ) : (
+                    <Button onClick={stopRecording} className="btn btn--danger">
+                      <Square size={16} /> {t('transcribe.stopRecording')}
+                    </Button>
+                  )}
+                  <Button onClick={() => analyzeTranscript(rawTranscript)}
+                    disabled={isAnalyzing || rawTranscript.length < 50}
+                    className="btn btn--ghost" title="Trigger AI keyword analysis">
+                    <RefreshCw size={16} /> {isAnalyzing ? t('transcribe.analyzing') : 'Analyze'}
                   </Button>
-                  <Button onClick={startDemo} className="btn btn--ghost">
-                    <Play size={16} /> Demo
-                  </Button>
-                </>
-              ) : (
-                <Button onClick={stopRecording} className="btn btn--danger">
-                  <Square size={16} /> Stop Recording
-                </Button>
-              )}
-              <Button onClick={() => analyzeTranscript(rawTranscript)}
-                disabled={isAnalyzing || rawTranscript.length < 50}
-                className="btn btn--ghost" title="Trigger AI keyword analysis">
-                <RefreshCw size={16} /> {isAnalyzing ? 'Analyzing…' : 'Analyze'}
-              </Button>
-            </div>
+                </div>
 
-            {(isRecording || isRealtimeStreaming) && (
-              <div className="recording-indicator">
-                <span className="recording-dot" />
-                Recording in progress{isAnalyzing ? ' (AI analyzing…)' : ''}
-              </div>
-            )}
-
-            {/* Transcript display / edit */}
-            {!transcriptionStopped ? (
-              <div className="transcript-display" onMouseUp={handleTextSelection}>
-                {rawTranscript ? renderHighlighted(rawTranscript) : (
-                  <span style={{ color: 'var(--text-muted)' }}>
-                    Your transcription will appear here.
-                    <br /><br />
-                    <small>The assistant will extract keywords and definitions automatically as you speak.</small>
-                  </span>
-                )}
-              </div>
-            ) : (
-              <div>
-                <Label className="form-label">Edit Transcript</Label>
-                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
-                  💡 Double-click a word to add it as a keyword
-                </p>
-                <textarea value={editedTranscript} onChange={(e) => setEditedTranscript(e.target.value)}
-                  onDoubleClick={handleTextareaDoubleClick}
-                  className="neon-textarea" style={{ minHeight: '300px', lineHeight: 1.8 }}
-                  placeholder="Your transcript will appear here. You can edit it before saving." />
-
-                {editedTranscript && keywords.length > 0 && (
-                  <div className="transcript-preview" style={{ marginTop: '1rem' }}>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem', fontWeight: 600 }}>Keywords highlighted:</div>
-                    {renderHighlighted(editedTranscript)}
+                {isRecording && (
+                  <div className="recording-indicator">
+                    <span className="recording-dot" />
+                    {autoCorrect ? 'Recording + AI correcting…' : 'Recording…'}
+                    {isAnalyzing ? ' (extracting keywords…)' : ''}
                   </div>
                 )}
-              </div>
+
+                {/* Transcript area */}
+                {!transcriptionStopped ? (
+                  <div className="transcript-display" onMouseUp={handleTextSelection}>
+                    {correctedText || pendingChunks.length > 0 || interimText ? (
+                      <>
+                        <span>{correctedText}</span>
+                        {pendingChunks.map(c => (
+                          <span key={c.id} style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                            {c.raw}
+                          </span>
+                        ))}
+                        {interimText && (
+                          <span style={{ color: 'var(--text-muted)', opacity: 0.5 }}>{interimText}|</span>
+                        )}
+                      </>
+                    ) : (
+                      <span style={{ color: 'var(--text-muted)' }}>
+                        Your transcription will appear here.
+                        <br /><br />
+                        <small>Keywords are extracted automatically as you speak.</small>
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <div>
+                    <Label className="form-label">{t('transcribe.transcriptLabel')}</Label>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
+                      💡 {t('transcribe.editHint')}
+                    </p>
+                    <textarea value={editedTranscript} onChange={(e) => setEditedTranscript(e.target.value)}
+                      onDoubleClick={handleTextareaDoubleClick}
+                      className="neon-textarea" style={{ minHeight: '300px', lineHeight: 1.8 }}
+                      placeholder="Your transcript will appear here. You can edit it before saving." />
+                    {editedTranscript && keywords.length > 0 && (
+                      <div className="transcript-preview" style={{ marginTop: '1rem' }}>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem', fontWeight: 600 }}>
+                          Keywords highlighted:
+                        </div>
+                        {renderHighlighted(editedTranscript)}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
             )}
 
+            {/* ── UPLOAD MODE ── */}
+            {inputMode === 'upload' && (
+              <>
+                {/* Drop zone */}
+                <div
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={handleFileDrop}
+                  onClick={() => document.getElementById('audio-upload-input').click()}
+                  style={{
+                    border: `2px dashed ${uploadFile ? 'var(--accent-primary)' : 'var(--card-border)'}`,
+                    borderRadius: '0.75rem',
+                    padding: '2rem 1.5rem',
+                    textAlign: 'center',
+                    cursor: 'pointer',
+                    transition: 'border-color 0.2s',
+                    background: uploadFile ? 'rgba(110,231,247,0.04)' : 'transparent',
+                  }}>
+                  <input id="audio-upload-input" type="file"
+                    accept=".mp3,.m4a,.wav,.ogg,.webm,.flac"
+                    style={{ display: 'none' }}
+                    onChange={(e) => setUploadFile(e.target.files[0] || null)} />
+
+                  {uploadFile ? (
+                    <div>
+                      <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🎵</div>
+                      <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>
+                        {uploadFile.name}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        {(uploadFile.size / 1024 / 1024).toFixed(1)} MB
+                      </div>
+                      <button type="button"
+                        style={{ marginTop: '0.75rem', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.25rem', margin: '0.75rem auto 0' }}
+                        onClick={(e) => { e.stopPropagation(); setUploadFile(null); }}>
+                        <X size={12} /> Remove
+                      </button>
+                    </div>
+                  ) : (
+                    <div>
+                      <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>📁</div>
+                      <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: '0.5rem' }}>
+                        {t('transcribe.uploadPrompt')}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        {t('transcribe.uploadFormats')}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Transcribe button */}
+                {uploadFile && !transcriptionStopped && (
+                  <Button onClick={handleTranscribeFile} disabled={isTranscribingFile} className="btn">
+                    {isTranscribingFile ? (
+                      <><RefreshCw size={16} style={{ animation: 'spin 1s linear infinite' }} /> {t('transcribe.transcribing')}</>
+                    ) : (
+                      <><Upload size={16} /> {t('transcribe.transcribeBtn')}</>
+                    )}
+                  </Button>
+                )}
+
+                {/* Edit textarea after upload */}
+                {transcriptionStopped && (
+                  <div>
+                    <Label className="form-label">{t('transcribe.transcriptLabel')}</Label>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
+                      💡 {t('transcribe.editHint')}
+                    </p>
+                    <textarea value={editedTranscript} onChange={(e) => setEditedTranscript(e.target.value)}
+                      onDoubleClick={handleTextareaDoubleClick}
+                      className="neon-textarea" style={{ minHeight: '300px', lineHeight: 1.8 }}
+                      placeholder="Transcription result will appear here." />
+                    {editedTranscript && keywords.length > 0 && (
+                      <div className="transcript-preview" style={{ marginTop: '1rem' }}>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem', fontWeight: 600 }}>
+                          Keywords highlighted:
+                        </div>
+                        {renderHighlighted(editedTranscript)}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* ── Keyword selection banner ── */}
             {selectedText && (
               <div className="selection-banner">
                 <span style={{ fontSize: '0.875rem', flex: 1 }}>
-                  Selected: <strong style={{ color: 'var(--accent-cyan)' }}>{selectedText}</strong>
+                  Selected: <strong style={{ color: 'var(--accent-primary)' }}>{selectedText}</strong>
                 </span>
                 <Button onClick={addKeyword} size="sm" className="btn btn--sm">
                   <Highlighter size={14} /> Add Keyword
@@ -452,20 +739,79 @@ const Transcribe = () => {
               </div>
             )}
 
-            {/* Save / Clear */}
+            {/* ── AI Correction diff panel ── */}
+            {correctionDiff && (
+              <div style={{
+                padding: '1rem', borderRadius: '0.75rem',
+                border: '1px solid var(--accent-primary)',
+                background: 'rgba(110,231,247,0.04)',
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                  <span style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--accent-primary)' }}>
+                    ✨ {t('transcribe.correctionTitle')}
+                  </span>
+                  <button type="button" onClick={() => setCorrectionDiff(null)}
+                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '0.25rem' }}>
+                    <X size={14} />
+                  </button>
+                </div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.5rem', lineHeight: 1.6, maxHeight: '180px', overflowY: 'auto' }}>
+                  <div style={{ color: 'var(--accent-red)', textDecoration: 'line-through', marginBottom: '0.5rem' }}>
+                    {correctionDiff.original.slice(0, 300)}{correctionDiff.original.length > 300 ? '…' : ''}
+                  </div>
+                  <div style={{ color: 'var(--accent-green)' }}>
+                    {correctionDiff.corrected.slice(0, 300)}{correctionDiff.corrected.length > 300 ? '…' : ''}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
+                  <button type="button" className="btn btn--sm" onClick={acceptCorrection}>
+                    ✅ {t('transcribe.acceptCorrection')}
+                  </button>
+                  <button type="button" className="btn btn--ghost btn--sm" onClick={() => setCorrectionDiff(null)}>
+                    ↩ {t('transcribe.rejectCorrection')}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* ── AI correction suggestion (post-transcription) ── */}
+            {transcriptionStopped && hasEnoughForCorrection && !correctionDiff && !isCorrectingFull && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.75rem 1rem',
+                borderRadius: '0.75rem', background: 'rgba(167,139,250,0.06)',
+                border: '1px solid rgba(167,139,250,0.2)',
+              }}>
+                <Sparkles size={16} style={{ color: 'var(--accent-purple)', flexShrink: 0 }} />
+                <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', flex: 1 }}>
+                  {t('transcribe.correctBtn')}
+                </span>
+                <button type="button" className="btn btn--sm btn--ghost" onClick={runFullCorrection}>
+                  {t('transcribe.correctBtn')}
+                </button>
+              </div>
+            )}
+            {isCorrectingFull && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', color: 'var(--text-muted)' }}>
+                <RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} />
+                {t('transcribe.correcting')}
+              </div>
+            )}
+
+            {/* ── Save / Clear ── */}
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
               <Button onClick={saveTranscript} disabled={!editedTranscript || isSaving || !subject} className="btn">
-                <Save size={16} /> {isSaving ? 'Saving…' : 'Save Transcript'}
+                <Save size={16} /> {isSaving ? t('transcribe.saving') : t('transcribe.saveBtn')}
               </Button>
-              <Button onClick={clearTranscript} disabled={!rawTranscript && !editedTranscript} className="btn btn--ghost">
-                <Trash2 size={16} /> Clear
+              <Button onClick={clearTranscript} disabled={!rawTranscript && !editedTranscript && !uploadFile} className="btn btn--ghost">
+                <Trash2 size={16} /> {t('transcribe.resetBtn')}
               </Button>
             </div>
 
             {isSummarizing && (
               <div style={{
-                padding: '1rem', background: 'rgba(0,255,231,0.06)', border: '1px solid rgba(0,255,231,0.15)',
-                borderRadius: '0.75rem', fontSize: '0.875rem', color: 'var(--accent-cyan)' }}>
+                padding: '1rem', background: 'rgba(110,231,247,0.06)',
+                border: '1px solid rgba(110,231,247,0.15)',
+                borderRadius: '0.75rem', fontSize: '0.875rem', color: 'var(--accent-primary)' }}>
                 ⏳ Summary is generated automatically after save.
               </div>
             )}
@@ -476,9 +822,9 @@ const Transcribe = () => {
         <div className="card keyword-sidebar">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
             <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-              Keywords ({keywords.length})
+              {t('transcribe.keywordsTitle')} ({keywords.length})
             </h3>
-            {isAnalyzing && <span className="tag tag--cyan" style={{ fontSize: '0.7rem' }}>AI analyzing…</span>}
+            {isAnalyzing && <span className="tag tag--cyan" style={{ fontSize: '0.7rem' }}>{t('transcribe.analyzing')}</span>}
           </div>
 
           {keywords.length === 0 ? (
@@ -492,7 +838,11 @@ const Transcribe = () => {
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
                       {kw.text}
-                      {kw.source && <span className={`tag tag--${kw.source === 'ai' ? 'cyan' : 'yellow'}`}>{kw.source}</span>}
+                      {kw.source && (
+                        <span className={`tag tag--${kw.source === 'ai' ? 'cyan' : 'yellow'}`}>
+                          {kw.source === 'ai' ? t('transcribe.keywordSource_ai') : t('transcribe.keywordSource_manual')}
+                        </span>
+                      )}
                     </div>
                     {kw.explanation && (
                       <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>{kw.explanation}</div>
@@ -500,7 +850,7 @@ const Transcribe = () => {
                   </div>
                   <button onClick={() => removeKeyword(kw.text)}
                     style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '0.25rem', flexShrink: 0 }}
-                    title="Remove keyword">
+                    title={t('transcribe.deleteKeyword')}>
                     <Trash2 size={14} />
                   </button>
                 </div>

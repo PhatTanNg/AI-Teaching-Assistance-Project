@@ -1,18 +1,21 @@
+import { useMemo } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useTheme } from 'next-themes';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useLanguage } from '../context/LanguageContext.jsx';
 import { Mic, FileText, BookMarked, Target, LogOut, Moon, Sun, ChevronLeft, ChevronRight } from 'lucide-react';
-
-const navItems = [
-  { icon: Mic,        label: 'Transcribe',  path: '/transcribe' },
-  { icon: FileText,   label: 'Transcripts', path: '/transcripts' },
-  { icon: BookMarked, label: 'Keywords',    path: '/keywords' },
-  { icon: Target,     label: 'Revision',    path: '/revision' },
-];
 
 export default function Sidebar({ collapsed = false, onCollapse }) {
   const { user, logout } = useAuth();
   const { theme, setTheme } = useTheme();
+  const { lang, setLang, t } = useLanguage();
+
+  const navItems = useMemo(() => [
+    { icon: Mic,        label: t('nav.transcribe'),  path: '/transcribe' },
+    { icon: FileText,   label: t('nav.transcripts'), path: '/transcripts' },
+    { icon: BookMarked, label: t('nav.keywords'),    path: '/keywords' },
+    { icon: Target,     label: t('nav.revision'),    path: '/revision' },
+  ], [t]);
 
   const isDark = theme !== 'light';
   const toggleTheme = () => setTheme(isDark ? 'light' : 'dark');
@@ -76,18 +79,32 @@ export default function Sidebar({ collapsed = false, onCollapse }) {
             className="sidebar__controls"
             style={collapsed ? { flexDirection: 'column', alignItems: 'center', gap: '0.4rem' } : {}}
           >
-            <div
+            <NavLink
+              to="/profile"
               className="sidebar__avatar"
-              title={displayName}
-              aria-label={`User: ${displayName}`}
+              title={collapsed ? `${displayName} — ${t('nav.profile')}` : t('nav.profile')}
+              aria-label={`${t('nav.profile')}: ${displayName}`}
+              style={{ textDecoration: 'none' }}
             >
               {initials}
-            </div>
+            </NavLink>
             {!collapsed && (
-              <span className="sidebar__user-name">
-                {displayName}
-              </span>
+              <NavLink to="/profile" style={{ textDecoration: 'none', flex: 1, minWidth: 0 }}>
+                <span className="sidebar__user-name">
+                  {displayName}
+                </span>
+              </NavLink>
             )}
+            <button
+              className="sidebar__theme-btn"
+              onClick={() => setLang(lang === 'vi' ? 'en' : 'vi')}
+              title={lang === 'vi' ? 'Switch to English' : 'Chuyển sang Tiếng Việt'}
+              type="button"
+              aria-label={lang === 'vi' ? 'Switch to English' : 'Chuyển sang Tiếng Việt'}
+              style={{ fontSize: '13px', fontWeight: 600 }}
+            >
+              {lang === 'vi' ? '🇬🇧' : '🇻🇳'}
+            </button>
             <button
               className="sidebar__theme-btn"
               onClick={toggleTheme}
@@ -103,7 +120,7 @@ export default function Sidebar({ collapsed = false, onCollapse }) {
           {!collapsed ? (
             <button className="sidebar__logout" onClick={logout} type="button">
               <LogOut size={14} style={{ display: 'inline', verticalAlign: '-2px', marginRight: 4 }} />
-              Log out
+              {t('nav.logout')}
             </button>
           ) : (
             <button

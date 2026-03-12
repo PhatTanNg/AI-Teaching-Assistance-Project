@@ -34,7 +34,7 @@
   /* Layout */
   --sidebar-width:       240px;
   --sidebar-collapsed:   64px;
-  --bottom-nav-height:   64px;
+  --bottom-nav-height:   0px; /* 0 on desktop; overridden to 64px on mobile */
 
   /* Typography */
   --font-display: 'Space Grotesk', system-ui, sans-serif;
@@ -2468,6 +2468,10 @@ html.light .transcript-card:hover {
 /* ==============================================
    MASCOT
    ============================================== */
+/* Hide on mobile — used for Mascot wrapper */
+.desktop-only { display: block; }
+@media (max-width: 640px) { .desktop-only { display: none; } }
+
 .mascot {
   position: fixed;
   bottom: 20px;
@@ -2612,6 +2616,7 @@ html.light .transcript-card:hover {
    RESPONSIVE — MOBILE (≤ 640px)
    ============================================== */
 @media (max-width: 640px) {
+  :root { --bottom-nav-height: 64px; }
   .sidebar { display: none; }
   .app-main { margin-left: 0 !important; }
 

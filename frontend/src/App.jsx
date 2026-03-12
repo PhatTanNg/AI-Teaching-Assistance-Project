@@ -4,6 +4,7 @@ import { useTheme } from 'next-themes';
 import { Moon, Sun } from 'lucide-react';
 import Sidebar from './components/Sidebar.jsx';
 import Mascot from './components/Mascot.jsx';
+import MonkeyChat from './components/MonkeyChat.jsx';
 import ThemeTransition from './components/ThemeTransition.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import { useAuth } from './context/AuthContext.jsx';
@@ -14,6 +15,7 @@ import Transcribe from './pages/Transcribe.jsx';
 import Transcripts from './pages/Transcripts.jsx';
 import Keywords from './pages/Keywords.jsx';
 import RevisionModePage from './pages/RevisionModePage.jsx';
+import Profile from './pages/Profile.jsx';
 
 /* Authenticated layout — sidebar + main content area */
 function AppLayout() {
@@ -33,6 +35,7 @@ function AppLayout() {
           <Outlet />
         </div>
       </main>
+      <MonkeyChat />
     </div>
   );
 }
@@ -132,7 +135,8 @@ export default function App() {
     <>
       <a href="#main-content" className="skip-link">Skip to main content</a>
       <ThemeTransition />
-      <Mascot />
+      {/* Mascot: desktop only — hidden on mobile via CSS */}
+      <div className="desktop-only"><Mascot /></div>
       <Routes>
         {/* Public pages (no sidebar) */}
         <Route element={<PublicLayout />}>
@@ -148,6 +152,7 @@ export default function App() {
             <Route path="/transcripts" element={<Transcripts />} />
             <Route path="/keywords" element={<Keywords />} />
             <Route path="/revision" element={<RevisionModePage />} />
+            <Route path="/profile" element={<Profile />} />
           </Route>
         </Route>
 

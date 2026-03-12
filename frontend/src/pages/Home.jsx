@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, Fragment } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useLanguage } from '../context/LanguageContext.jsx';
 import {
   Mic,
   FileText,
@@ -10,49 +11,6 @@ import {
   ShieldCheck,
   Brain,
 } from 'lucide-react';
-
-const CYCLE_WORDS = ['notes', 'flashcards', 'quizzes'];
-const WORKFLOW_STEPS = [
-  { num: '01', label: 'Record' },
-  { num: '02', label: 'Transcribe' },
-  { num: '03', label: 'Revise' },
-];
-
-const features = [
-  {
-    icon: Mic,
-    title: 'Live Transcription',
-    description: 'Record your lecture, get text in real time. Stay focused on the discussion — we handle the notes.',
-    accent: 'cyan',
-  },
-  {
-    icon: Sparkles,
-    title: 'Smart Highlights',
-    description: 'AI surfaces the key ideas, definitions, and action items so nothing gets lost.',
-    accent: 'purple',
-  },
-  {
-    icon: ShieldCheck,
-    title: 'Secure by Design',
-    description: 'Your recordings stay private and protected. No data leaks.',
-    accent: 'green',
-  },
-];
-
-const quickLinks = [
-  {
-    to: '/transcripts',
-    title: 'View Transcripts',
-    description: 'Browse every lecture you have captured.',
-    icon: FileText,
-  },
-  {
-    to: '/keywords',
-    title: 'Saved Keywords',
-    description: 'Revisit highlighted concepts and definitions.',
-    icon: BookMarked,
-  },
-];
 
 const accentColor = {
   cyan:   'rgba(110,231,247,0.12)',
@@ -72,25 +30,42 @@ const accentGradient = {
 
 const Home = () => {
   const { isAuthenticated, user } = useAuth();
+  const { t } = useLanguage();
   const cardsRef = useRef([]);
 
-  // Word cycling state
+  const cycleWords = t('home.cycleWords');
   const [cycleIndex, setCycleIndex] = useState(0);
   const [isFading, setIsFading] = useState(false);
+
+  const workflowSteps = [
+    { num: '01', label: t('home.step1') },
+    { num: '02', label: t('home.step2') },
+    { num: '03', label: t('home.step3') },
+  ];
+
+  const features = [
+    { icon: Mic,        title: t('home.feat1Title'), description: t('home.feat1Desc'), accent: 'cyan' },
+    { icon: Sparkles,   title: t('home.feat2Title'), description: t('home.feat2Desc'), accent: 'purple' },
+    { icon: ShieldCheck,title: t('home.feat3Title'), description: t('home.feat3Desc'), accent: 'green' },
+  ];
+
+  const quickLinks = [
+    { to: '/transcripts', title: t('home.quickTranscripts'), description: t('home.quickTranscriptsDesc'), icon: FileText },
+    { to: '/keywords',    title: t('home.quickKeywords'),    description: t('home.quickKeywordsDesc'),    icon: BookMarked },
+  ];
 
   useEffect(() => {
     if (isAuthenticated) return;
     const id = setInterval(() => {
       setIsFading(true);
       setTimeout(() => {
-        setCycleIndex(i => (i + 1) % CYCLE_WORDS.length);
+        setCycleIndex(i => (i + 1) % cycleWords.length);
         setIsFading(false);
       }, 300);
     }, 2500);
     return () => clearInterval(id);
-  }, [isAuthenticated]);
+  }, [isAuthenticated, cycleWords.length]);
 
-  // Scroll-based fade-in on feature cards
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
@@ -103,15 +78,10 @@ const Home = () => {
       },
       { threshold: 0.1 }
     );
-
     const cards = cardsRef.current;
     cards.forEach((el) => {
-      if (el) {
-        el.style.animationPlayState = 'paused';
-        observer.observe(el);
-      }
+      if (el) { el.style.animationPlayState = 'paused'; observer.observe(el); }
     });
-
     return () => observer.disconnect();
   }, []);
 
@@ -131,9 +101,9 @@ const Home = () => {
             </>
           ) : (
             <>
-              Never miss your{' '}
+              {t('home.heroPrefix')}{' '}
               <span className={`gradient-text home__cycle-word home__cycle-word--${isFading ? 'out' : 'in'}`}>
-                {CYCLE_WORDS[cycleIndex]}
+                {cycleWords[cycleIndex]}
               </span>
               .
             </>
@@ -142,38 +112,37 @@ const Home = () => {
         <p className="home__subtitle">
           {isAuthenticated
             ? 'Record → AI extracts keywords → Study with flashcards & quizzes. That easy.'
-            : 'Record lectures → AI does the boring stuff → You ace the exam. It really is that simple.'}
+            : t('home.heroSub')}
         </p>
         <div className="home__actions">
           {isAuthenticated ? (
             <Link className="btn home__cta" to="/transcribe">
               <Mic className="home__cta-icon" aria-hidden="true" />
-              Start recording
+              {t('home.backIn')}
               <ArrowRight className="home__cta-icon" aria-hidden="true" />
             </Link>
           ) : (
             <>
               <Link className="btn home__cta" to="/signup">
-                Get started free
+                {t('home.ctaStart')}
                 <ArrowRight className="home__cta-icon" aria-hidden="true" />
               </Link>
               <Link className="btn btn--ghost" to="/signin">
-                Sign in
+                {t('home.ctaSignIn')}
               </Link>
             </>
           )}
         </div>
 
-        {/* How it works */}
         {!isAuthenticated && (
           <div className="home__workflow" aria-label="How it works">
-            {WORKFLOW_STEPS.map(({ num, label }, i) => (
+            {workflowSteps.map(({ num, label }, i) => (
               <Fragment key={num}>
                 <div className="home__workflow-step">
                   <div className="home__workflow-num">{num}</div>
                   <span className="home__workflow-label">{label}</span>
                 </div>
-                {i < WORKFLOW_STEPS.length - 1 && (
+                {i < workflowSteps.length - 1 && (
                   <div className="home__workflow-connector" aria-hidden="true" />
                 )}
               </Fragment>
@@ -181,7 +150,6 @@ const Home = () => {
           </div>
         )}
 
-        {/* Decorative stat pills */}
         {!isAuthenticated && (
           <div className="home__stats">
             <span className="home__stat-pill">🎙️ Real-time transcription</span>
@@ -221,7 +189,7 @@ const Home = () => {
         <section className="home__quick-links" aria-label="Quick links">
           <h2 className="home__section-label">
             <Brain size={16} aria-hidden="true" />
-            Jump back in
+            {t('home.backIn')}
           </h2>
           <div className="home__quick-grid">
             {quickLinks.map(({ to, title, description, icon: Icon }) => (

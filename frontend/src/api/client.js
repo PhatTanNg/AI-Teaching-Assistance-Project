@@ -187,3 +187,42 @@ export const createKeywords = (token, { sessionId, keywords }) =>
 export const getKeywordsBySession = (token, sessionId) =>
   apiClient(`/api/content/keywords?sessionId=${sessionId}`, { method: 'GET', token });
 
+// ==================== TRANSCRIBE / AI CORRECTION ====================
+
+export const transcribeFile = async (token, audioFile, language = 'vi') => {
+  const form = new FormData();
+  form.append('audio', audioFile);
+  form.append('language', language);
+  const response = await fetch(`${baseUrl}/api/transcribe/upload`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+    credentials: 'include',
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.error || 'Transcription failed');
+  return payload; // { transcript }
+};
+
+export const correctTranscript = async (token, text, language = 'vi') => {
+  const response = await fetch(`${baseUrl}/api/transcribe/correct`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ text, language }),
+    credentials: 'include',
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.error || 'Correction failed');
+  return payload; // { corrected }
+};
+
+// ==================== CHAT STREAM ====================
+
+export const streamChat = (token, messages, context = {}) =>
+  fetch(`${baseUrl}/api/chat/stream`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ messages, context }),
+    credentials: 'include',
+  });
+
