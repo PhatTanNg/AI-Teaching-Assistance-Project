@@ -5,6 +5,68 @@ import { useLanguage } from '../context/LanguageContext.jsx';
 import { useChatContext } from '../context/ChatContext.jsx';
 import { streamChat, getTranscripts } from '../api/client.js';
 
+/* ── Lightweight markdown renderer ── */
+function inlineMarkdown(text) {
+  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g);
+  return parts.map((part, i) => {
+    if (part.startsWith('**') && part.endsWith('**'))
+      return <strong key={i}>{part.slice(2, -2)}</strong>;
+    if (part.startsWith('*') && part.endsWith('*'))
+      return <em key={i}>{part.slice(1, -1)}</em>;
+    if (part.startsWith('`') && part.endsWith('`'))
+      return <code key={i} style={{ background: 'rgba(255,255,255,0.1)', padding: '0.1em 0.3em', borderRadius: '3px', fontFamily: 'monospace', fontSize: '0.8em' }}>{part.slice(1, -1)}</code>;
+    return part;
+  });
+}
+
+function renderMarkdown(text) {
+  if (!text) return null;
+  const lines = text.split('\n');
+  const elements = [];
+  let listItems = [];
+  let listType = null;
+  let key = 0;
+
+  const flushList = () => {
+    if (!listItems.length) return;
+    const Tag = listType === 'ol' ? 'ol' : 'ul';
+    elements.push(
+      <Tag key={key++} style={{ margin: '0.25rem 0', paddingLeft: '1.25rem' }}>
+        {listItems.map((li, j) => <li key={j}>{inlineMarkdown(li)}</li>)}
+      </Tag>
+    );
+    listItems = [];
+    listType = null;
+  };
+
+  for (const line of lines) {
+    const heading = line.match(/^#{1,3}\s+(.+)/);
+    const ulItem  = line.match(/^[-*]\s+(.*)/);
+    const olItem  = line.match(/^\d+\.\s+(.*)/);
+
+    if (heading) {
+      flushList();
+      elements.push(<p key={key++} style={{ fontWeight: 700, margin: '0.3rem 0 0.1rem' }}>{inlineMarkdown(heading[1])}</p>);
+    } else if (ulItem) {
+      if (listType === 'ol') flushList();
+      listType = 'ul';
+      listItems.push(ulItem[1]);
+    } else if (olItem) {
+      if (listType === 'ul') flushList();
+      listType = 'ol';
+      listItems.push(olItem[1]);
+    } else if (line.trim() === '') {
+      flushList();
+      if (elements.length) elements.push(<div key={key++} style={{ height: '0.35rem' }} />);
+    } else {
+      flushList();
+      elements.push(<p key={key++} style={{ margin: '0.1rem 0' }}>{inlineMarkdown(line)}</p>);
+    }
+  }
+  flushList();
+  return elements;
+}
+
 export default function MonkeyChat() {
   const { token } = useAuth();
   const { t } = useLanguage();
@@ -297,14 +359,19 @@ export default function MonkeyChat() {
                   color: m.role === 'user' ? '#0f1117' : 'var(--text-primary)',
                   fontSize: '0.85rem',
                   lineHeight: 1.5,
-                  whiteSpace: 'pre-wrap',
+                  whiteSpace: m.role === 'user' ? 'pre-wrap' : 'normal',
                   wordBreak: 'break-word',
                 }}>
-                  {m.content || (
-                    <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                      {t('chat.thinking')}
-                    </span>
-                  )}
+                  {m.content
+                    ? m.role === 'assistant'
+                      ? <div style={{ lineHeight: 1.5 }}>{renderMarkdown(m.content)}</div>
+                      : m.content
+                    : (
+                      <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                        {t('chat.thinking')}
+                      </span>
+                    )
+                  }
                 </div>
               </div>
             ))}
