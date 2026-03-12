@@ -1,28 +1,17 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
+import { RotateCcw } from 'lucide-react';
 
 const OPTION_KEYS = ['A', 'B', 'C', 'D'];
 
-/**
- * Normalize options from any format:
- *   object  → { A: "text", B: "text", ... }
- *   array   → [{ label: "A", text: "..." }, ...]  OR  ["text", "text", ...]
- * Returns a safe { A, B, C, D } object.
- */
 function normalizeOptions(raw) {
   if (!raw) return {};
-
-  // Already an object with A/B/C/D keys
   if (typeof raw === 'object' && !Array.isArray(raw)) {
-    // check if it has A/B/C/D with truthy string values
     if (raw.A || raw.B || raw.C || raw.D) return raw;
-    // fallback: might have lowercase keys
     if (raw.a || raw.b || raw.c || raw.d) {
       return { A: raw.a || '', B: raw.b || '', C: raw.c || '', D: raw.d || '' };
     }
     return raw;
   }
-
-  // Array of objects with label+text
   if (Array.isArray(raw)) {
     const result = {};
     raw.forEach((item, i) => {
@@ -35,16 +24,28 @@ function normalizeOptions(raw) {
     });
     return result;
   }
-
   return {};
 }
 
-/**
- * Extract question text from various possible field names
- */
 function getQuestionText(q) {
   if (!q) return '';
   return q.question || q.content || q.body || q.text || q.title || '';
+}
+
+function getResultEmoji(pct) {
+  if (pct === 100) return '🏆';
+  if (pct >= 80)  return '🌟';
+  if (pct >= 60)  return '👍';
+  if (pct >= 40)  return '📚';
+  return '💪';
+}
+
+function getResultMsg(pct) {
+  if (pct === 100) return 'Hoàn hảo! Bạn đã trả lời đúng tất cả!';
+  if (pct >= 80)  return 'Xuất sắc! Kiến thức rất vững!';
+  if (pct >= 60)  return 'Khá tốt! Ôn thêm một chút nữa nhé.';
+  if (pct >= 40)  return 'Cố lên! Hãy xem lại bài giảng.';
+  return 'Đừng nản — ôn lại và thử lại nào!';
 }
 
 export default function McqQuiz({ questions, onSubmitBatch, isLoading }) {
@@ -52,14 +53,23 @@ export default function McqQuiz({ questions, onSubmitBatch, isLoading }) {
   const [selected, setSelected] = useState('');
   const [feedback, setFeedback] = useState(null);
   const [correctCount, setCorrectCount] = useState(0);
+  const [done, setDone] = useState(false);
 
   const currentQuestion = useMemo(
     () => (questions?.length > 0 ? questions[index] : null),
     [questions, index],
   );
 
+  const restart = () => {
+    setIndex(0);
+    setSelected('');
+    setFeedback(null);
+    setCorrectCount(0);
+    setDone(false);
+  };
 
-  if (!currentQuestion) {
+  // ── Empty state ──
+  if (!currentQuestion && !done) {
     return (
       <section className="card revision-card">
         <h2 className="revision-card__title">MCQ Quiz</h2>
@@ -68,8 +78,46 @@ export default function McqQuiz({ questions, onSubmitBatch, isLoading }) {
     );
   }
 
+  // ── Results screen ──
+  if (done) {
+    const total = questions.length;
+    const pct = Math.round((correctCount / total) * 100);
+    const emoji = getResultEmoji(pct);
+    const msg = getResultMsg(pct);
+
+    return (
+      <section className="card revision-card">
+        <h2 className="revision-card__title">MCQ Quiz</h2>
+
+        <div className="mcq-results">
+          <div className="mcq-results__emoji">{emoji}</div>
+          <div className="mcq-results__score">
+            <span className="mcq-results__num">{correctCount}</span>
+            <span className="mcq-results__den">/{total}</span>
+          </div>
+          <div className="mcq-results__pct">{pct}% correct</div>
+          <p className="mcq-results__msg">{msg}</p>
+
+          {/* Thin progress bar */}
+          <div className="mcq-progress-bar" style={{ marginBottom: '1.5rem' }}>
+            <div
+              className="mcq-progress-bar__fill"
+              style={{ width: `${pct}%`, background: pct >= 60 ? 'var(--accent-green)' : pct >= 40 ? 'var(--accent-yellow)' : 'var(--accent-red)' }}
+            />
+          </div>
+
+          <button type="button" className="btn" onClick={restart} style={{ gap: '0.5rem' }}>
+            <RotateCcw size={15} /> Làm lại
+          </button>
+        </div>
+      </section>
+    );
+  }
+
+  // ── Quiz ──
   const questionText = getQuestionText(currentQuestion);
   const options = normalizeOptions(currentQuestion.options);
+  const isLastQuestion = index === questions.length - 1;
 
   const submitAnswer = async () => {
     if (!selected) return;
@@ -82,9 +130,13 @@ export default function McqQuiz({ questions, onSubmitBatch, isLoading }) {
   };
 
   const nextQuestion = () => {
-    setSelected('');
-    setFeedback(null);
-    if (index < questions.length - 1) setIndex(prev => prev + 1);
+    if (isLastQuestion) {
+      setDone(true);
+    } else {
+      setSelected('');
+      setFeedback(null);
+      setIndex(prev => prev + 1);
+    }
   };
 
   return (
@@ -92,16 +144,21 @@ export default function McqQuiz({ questions, onSubmitBatch, isLoading }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
         <h2 className="revision-card__title">MCQ Quiz</h2>
         <span className="mcq-score">
-          {correctCount}/{index + (feedback ? 1 : 0)} correct
+          {correctCount}/{questions.length} correct
         </span>
       </div>
 
-      <div className="mcq-progress-bar">
-        <div className="mcq-progress-bar__fill" style={{ width: `${((index + (feedback ? 1 : 0)) / questions.length) * 100}%` }} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+        <div className="mcq-progress-bar" style={{ flex: 1, margin: 0 }}>
+          <div className="mcq-progress-bar__fill" style={{ width: `${((index + 1) / questions.length) * 100}%` }} />
+        </div>
+        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', flexShrink: 0 }}>
+          {index + 1}/{questions.length}
+        </span>
       </div>
 
       <p className="mcq-question">
-        {questionText || <span style={{ color: 'var(--accent-rose)', fontStyle: 'italic' }}>[Question text missing]</span>}
+        {questionText || <span style={{ color: 'var(--accent-red)', fontStyle: 'italic' }}>[Question text missing]</span>}
       </p>
 
       <div className="mcq-options">
@@ -144,9 +201,8 @@ export default function McqQuiz({ questions, onSubmitBatch, isLoading }) {
             Submit Answer
           </button>
         ) : (
-          <button type="button" className="btn" onClick={nextQuestion}
-            disabled={isLoading || index >= questions.length - 1}>
-            Next Question →
+          <button type="button" className="btn" onClick={nextQuestion} disabled={isLoading}>
+            {isLastQuestion ? 'Xem kết quả →' : 'Next Question →'}
           </button>
         )}
       </div>

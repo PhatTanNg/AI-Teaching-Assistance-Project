@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom';
 import { useTheme } from 'next-themes';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useLanguage } from '../context/LanguageContext.jsx';
-import { Mic, FileText, BookMarked, Target, LogOut, Moon, Sun, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Mic, FileText, BookMarked, Target, LogOut, Moon, Sun, ChevronLeft, ChevronRight, User } from 'lucide-react';
 
 export default function Sidebar({ collapsed = false, onCollapse }) {
   const { user, logout } = useAuth();
@@ -162,6 +162,15 @@ export default function Sidebar({ collapsed = false, onCollapse }) {
             <span className="bottom-nav__label">{label}</span>
           </NavLink>
         ))}
+        <NavLink
+          to="/profile"
+          className={({ isActive }) =>
+            `bottom-nav__link${isActive ? ' bottom-nav__link--active' : ''}`
+          }
+        >
+          <span className="bottom-nav__icon"><User size={22} /></span>
+          <span className="bottom-nav__label">{t('nav.profile')}</span>
+        </NavLink>
       </nav>
     </>
   );

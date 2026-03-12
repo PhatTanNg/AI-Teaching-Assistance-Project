@@ -5,6 +5,8 @@ import { Moon, Sun } from 'lucide-react';
 import Sidebar from './components/Sidebar.jsx';
 import Mascot from './components/Mascot.jsx';
 import MonkeyChat from './components/MonkeyChat.jsx';
+import { Toaster } from './components/ui/sonner';
+import OnboardingModal, { useOnboarding } from './components/OnboardingModal.jsx';
 import ThemeTransition from './components/ThemeTransition.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import { useAuth } from './context/AuthContext.jsx';
@@ -21,6 +23,7 @@ import Profile from './pages/Profile.jsx';
 function AppLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const sidebarWidth = sidebarCollapsed ? 'var(--sidebar-collapsed)' : 'var(--sidebar-width)';
+  const { show: showOnboarding, dismiss: dismissOnboarding } = useOnboarding();
 
   return (
     <div className="app-layout">
@@ -36,6 +39,8 @@ function AppLayout() {
         </div>
       </main>
       <MonkeyChat />
+      <Toaster position="top-right" richColors />
+      {showOnboarding && <OnboardingModal onDismiss={dismissOnboarding} />}
     </div>
   );
 }

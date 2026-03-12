@@ -5,6 +5,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Alert, AlertDescription } from '../components/ui/alert';
+import { toast } from 'sonner';
 import { createTranscript, createKeywords, transcribeFile, correctTranscript } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -415,7 +416,7 @@ const Transcribe = () => {
       setRawTranscript(''); setEditedTranscript(''); setKeywords([]);
       setSelectedText(''); setLastAnalyzedLength(0); setHoveredKeyword(null);
       setSubject(''); setTranscriptionStopped(false);
-      alert('Transcript saved! Summary is being generated…');
+      toast.success('Transcript saved!', { description: 'Summary is being generated…' });
       navigate('/transcripts');
     } catch (err) {
       const msg = err?.payload?.error || err?.message || 'Failed to save transcript';

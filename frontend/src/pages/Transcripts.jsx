@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileText, Trash2, Calendar, Eye, Edit2, Save, X } from 'lucide-react';
+import { FileText, Trash2, Calendar, Eye, Edit2, Save, X, BookOpen, AlignLeft, Sparkles } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Alert, AlertDescription } from '../components/ui/alert';
 import {
@@ -10,6 +10,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../components/ui/dialog';
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '../components/ui/tabs';
 import {
   getTranscripts,
   deleteTranscript,
@@ -116,7 +122,6 @@ const Transcripts = () => {
       {transcripts.length === 0 ? (
         <div className="card">
           <div className="empty-state">
-            {/* Inline SVG illustration */}
             <svg className="empty-state__art" width="120" height="100" viewBox="0 0 120 100" fill="none" aria-hidden="true">
               <rect x="20" y="20" width="80" height="60" rx="8" fill="rgba(110,231,247,0.08)" stroke="rgba(110,231,247,0.2)" strokeWidth="1.5"/>
               <rect x="32" y="34" width="40" height="4" rx="2" fill="rgba(110,231,247,0.3)"/>
@@ -174,105 +179,142 @@ const Transcripts = () => {
         </div>
       )}
 
-      {/* Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) setLectureContext(null); }}>
-        <DialogContent style={{
-          maxWidth: '900px', maxHeight: '80vh', overflowY: 'auto',
-          position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%, -50%)',
-          zIndex: 9999, backgroundColor: 'var(--bg-secondary)',
-          borderRadius: '1rem', border: '1px solid var(--glass-border)',
-          boxShadow: '0 20px 60px rgba(0,0,0,0.5)', padding: '1.5rem', color: 'var(--text-primary)'
-        }}>
-          <DialogHeader>
-            <DialogTitle style={{ color: 'var(--text-primary)' }}>
-              {selectedTranscript?.subject || 'Transcript'}
-            </DialogTitle>
-            <DialogDescription style={{ color: 'var(--text-secondary)' }}>
-              {selectedTranscript?.transcribedAt
-                ? new Date(selectedTranscript.transcribedAt).toLocaleDateString()
-                : ''}
-            </DialogDescription>
-          </DialogHeader>
-
+      {/* Transcript Detail Dialog */}
+      <Dialog open={isDialogOpen} onOpenChange={(open) => {
+        setIsDialogOpen(open);
+        if (!open) { setLectureContext(null); cancelEdit(); }
+      }}>
+        <DialogContent className="transcript-dialog">
           {selectedTranscript ? (
-            <div style={{ marginTop: '1rem', display: 'grid', gap: '1.5rem' }}>
-              {/* Transcript Section */}
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                  <h4 style={{ color: 'var(--text-primary)' }}>{t('transcripts.transcriptLabel')}</h4>
-                  {editingField !== 'rawTranscript' && (
-                    <Button onClick={() => startEdit('rawTranscript', selectedTranscript.rawTranscript)}
-                      size="sm" className="btn btn--ghost btn--sm">
-                      <Edit2 size={14} />
-                    </Button>
-                  )}
+            <>
+              <DialogHeader style={{ paddingBottom: '0.75rem', borderBottom: '1px solid var(--glass-border)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <div style={{
+                    width: 40, height: 40, borderRadius: '0.75rem', flexShrink: 0,
+                    background: 'rgba(110,231,247,0.1)', border: '1px solid rgba(110,231,247,0.2)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: 'var(--accent-primary)'
+                  }}>
+                    <BookOpen size={20} />
+                  </div>
+                  <div style={{ minWidth: 0 }}>
+                    <DialogTitle style={{ color: 'var(--text-primary)', fontSize: '1.05rem', lineHeight: 1.3 }}>
+                      {selectedTranscript.subject || 'Transcript'}
+                    </DialogTitle>
+                    <DialogDescription style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginTop: '0.1rem', display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <Calendar size={11} />
+                      {selectedTranscript.transcribedAt
+                        ? new Date(selectedTranscript.transcribedAt).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                        : ''}
+                    </DialogDescription>
+                  </div>
                 </div>
-                {editingField === 'rawTranscript' ? (
-                  <div style={{ display: 'grid', gap: '0.5rem' }}>
-                    <textarea className="neon-textarea" value={editingText}
-                      onChange={(e) => setEditingText(e.target.value)}
-                      style={{ minHeight: '200px', fontFamily: 'var(--font-mono)' }} />
-                    <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                      <Button onClick={handleSaveEdit} disabled={isSaving} className="btn btn--sm">
-                        <Save size={14} /> {isSaving ? t('common.loading') : t('transcripts.saveEdit')}
-                      </Button>
-                      <Button onClick={cancelEdit} className="btn btn--ghost btn--sm">
-                        <X size={14} />
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <div style={{ padding: '1rem', background: 'var(--bg-elevated)', borderRadius: '0.75rem',
-                    border: '1px solid var(--glass-border)', whiteSpace: 'pre-wrap', lineHeight: 1.6,
-                    fontSize: '0.9rem', color: 'var(--text-secondary)', maxHeight: '300px', overflowY: 'auto' }}>
-                    {selectedTranscript.rawTranscript}
-                  </div>
-                )}
-              </div>
+              </DialogHeader>
 
-              {/* Summary Section */}
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                  <h4 style={{ color: 'var(--text-primary)' }}>
-                    {t('transcripts.summaryLabel')} {!selectedTranscript.summary && (
-                      <span className="tag tag--yellow" style={{ marginLeft: '0.5rem' }}>Generating…</span>
+              <Tabs defaultValue="transcript" style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+                <TabsList style={{
+                  background: 'var(--bg-elevated)', border: '1px solid var(--glass-border)',
+                  borderRadius: '0.75rem', padding: '0.25rem', width: '100%',
+                  display: 'grid', gridTemplateColumns: '1fr 1fr', flexShrink: 0
+                }}>
+                  <TabsTrigger value="transcript" style={{ borderRadius: '0.5rem', gap: '0.4rem', fontSize: '0.83rem' }}>
+                    <AlignLeft size={13} /> {t('transcripts.transcriptLabel')}
+                  </TabsTrigger>
+                  <TabsTrigger value="summary" style={{ borderRadius: '0.5rem', gap: '0.4rem', fontSize: '0.83rem' }}>
+                    <Sparkles size={13} />
+                    {t('transcripts.summaryLabel')}
+                    {!selectedTranscript.summary && (
+                      <span style={{
+                        fontSize: '0.65rem', background: 'rgba(252,211,77,0.2)',
+                        color: 'var(--accent-yellow)', padding: '1px 5px', borderRadius: '999px'
+                      }}>...</span>
                     )}
-                  </h4>
-                  {selectedTranscript.summary && editingField !== 'summary' && (
-                    <Button onClick={() => startEdit('summary', selectedTranscript.summary)}
-                      size="sm" className="btn btn--ghost btn--sm">
-                      <Edit2 size={14} />
-                    </Button>
-                  )}
-                </div>
-                {editingField === 'summary' ? (
-                  <div style={{ display: 'grid', gap: '0.5rem' }}>
-                    <textarea className="neon-textarea" value={editingText}
-                      onChange={(e) => setEditingText(e.target.value)}
-                      style={{ minHeight: '150px' }} />
-                    <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                      <Button onClick={handleSaveEdit} disabled={isSaving} className="btn btn--sm">
-                        <Save size={14} /> {isSaving ? 'Saving…' : 'Save'}
-                      </Button>
-                      <Button onClick={cancelEdit} className="btn btn--ghost btn--sm">
-                        <X size={14} />
-                      </Button>
+                  </TabsTrigger>
+                </TabsList>
+
+                {/* Transcript tab */}
+                <TabsContent value="transcript" style={{ marginTop: '1rem', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+                  {editingField === 'rawTranscript' ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', flex: 1 }}>
+                      <textarea
+                        className="neon-textarea"
+                        value={editingText}
+                        onChange={(e) => setEditingText(e.target.value)}
+                        style={{ flex: 1, minHeight: '200px', fontFamily: 'var(--font-mono)', fontSize: '0.85rem' }}
+                      />
+                      <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', flexShrink: 0 }}>
+                        <Button onClick={handleSaveEdit} disabled={isSaving} className="btn btn--sm">
+                          <Save size={14} /> {isSaving ? t('common.loading') : t('transcripts.saveEdit')}
+                        </Button>
+                        <Button onClick={cancelEdit} className="btn btn--ghost btn--sm">
+                          <X size={14} />
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                ) : selectedTranscript.summary ? (
-                  <div style={{ padding: '1rem', background: 'rgba(74,222,128,0.06)', borderRadius: '0.75rem',
-                    border: '1px solid rgba(74,222,128,0.15)', lineHeight: 1.6, fontSize: '0.9rem',
-                    color: 'var(--text-secondary)' }}>
-                    {selectedTranscript.summary}
-                  </div>
-                ) : (
-                  <div style={{ padding: '1rem', background: 'rgba(252,211,77,0.06)', borderRadius: '0.75rem',
-                    border: '1px solid rgba(252,211,77,0.15)', color: 'var(--accent-yellow)', fontSize: '0.85rem' }}>
-                    Summary is being auto-generated. Refresh the page to see it when ready.
-                  </div>
-                )}
-              </div>
-            </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.5rem', flexShrink: 0 }}>
+                        <Button
+                          onClick={() => startEdit('rawTranscript', selectedTranscript.rawTranscript)}
+                          size="sm" className="btn btn--ghost btn--sm"
+                        >
+                          <Edit2 size={13} /> Edit
+                        </Button>
+                      </div>
+                      <div className="transcript-dialog__text-box" style={{ flex: 1 }}>
+                        {selectedTranscript.rawTranscript}
+                      </div>
+                    </div>
+                  )}
+                </TabsContent>
+
+                {/* Summary tab */}
+                <TabsContent value="summary" style={{ marginTop: '1rem', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+                  {editingField === 'summary' ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', flex: 1 }}>
+                      <textarea
+                        className="neon-textarea"
+                        value={editingText}
+                        onChange={(e) => setEditingText(e.target.value)}
+                        style={{ flex: 1, minHeight: '180px' }}
+                      />
+                      <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', flexShrink: 0 }}>
+                        <Button onClick={handleSaveEdit} disabled={isSaving} className="btn btn--sm">
+                          <Save size={14} /> {isSaving ? 'Saving…' : 'Save'}
+                        </Button>
+                        <Button onClick={cancelEdit} className="btn btn--ghost btn--sm">
+                          <X size={14} />
+                        </Button>
+                      </div>
+                    </div>
+                  ) : selectedTranscript.summary ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.5rem', flexShrink: 0 }}>
+                        <Button
+                          onClick={() => startEdit('summary', selectedTranscript.summary)}
+                          size="sm" className="btn btn--ghost btn--sm"
+                        >
+                          <Edit2 size={13} /> Edit
+                        </Button>
+                      </div>
+                      <div className="transcript-dialog__summary-box" style={{ flex: 1 }}>
+                        {selectedTranscript.summary}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="transcript-dialog__generating">
+                      <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>✨</div>
+                      <p style={{ fontWeight: 600, marginBottom: '0.25rem', color: 'var(--text-primary)' }}>
+                        Summary đang được tạo…
+                      </p>
+                      <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                        Tải lại trang sau ít phút để xem kết quả.
+                      </p>
+                    </div>
+                  )}
+                </TabsContent>
+              </Tabs>
+            </>
           ) : (
             <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
               No transcript selected.
