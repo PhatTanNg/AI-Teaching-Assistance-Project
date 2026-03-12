@@ -6,18 +6,18 @@ const STEPS = [
   {
     icon: '🐒',
     emoji: true,
-    title: 'Chào mừng đến với AITA!',
-    desc: 'Trợ lý học tập AI — giúp bạn biến bài giảng thành ghi chú, flashcard và câu hỏi ôn tập trong vài giây.',
-    cta: 'Bắt đầu tour',
+    title: 'Welcome to AITA!',
+    desc: 'Your AI lecture assistant — turn any lecture into notes, flashcards, and quiz questions in seconds.',
+    cta: 'Start tour',
     color: '#C8874A',
     bg: 'rgba(200,135,74,0.12)',
     border: 'rgba(200,135,74,0.25)',
   },
   {
     Icon: Mic,
-    title: 'Bước 1 — Ghi âm bài giảng',
-    desc: 'Bấm nút micro để ghi âm trực tiếp, hoặc tải file audio lên. AI sẽ tự động phiên âm và tóm tắt cho bạn.',
-    cta: 'Tiếp theo',
+    title: 'Step 1 — Record your lecture',
+    desc: 'Hit the mic button to record live, or upload an audio file. AI will transcribe and summarise it for you.',
+    cta: 'Next',
     color: '#6EE7F7',
     bg: 'rgba(110,231,247,0.1)',
     border: 'rgba(110,231,247,0.25)',
@@ -25,9 +25,9 @@ const STEPS = [
   },
   {
     Icon: BookOpen,
-    title: 'Bước 2 — Ôn lại & học từ khoá',
-    desc: 'Mở bài ghi để đọc phiên âm và tóm tắt. AI tự trích xuất từ khoá quan trọng — không cần ghi chú tay.',
-    cta: 'Tiếp theo',
+    title: 'Step 2 — Review & learn keywords',
+    desc: 'Open any transcript to read the full text and summary. AI extracts key terms automatically — no manual notes needed.',
+    cta: 'Next',
     color: '#A78BFA',
     bg: 'rgba(167,139,250,0.1)',
     border: 'rgba(167,139,250,0.25)',
@@ -35,9 +35,9 @@ const STEPS = [
   },
   {
     Icon: Brain,
-    title: 'Bước 3 — Ôn tập thông minh',
-    desc: 'Dùng Flashcard hoặc MCQ để kiểm tra kiến thức. Hỏi Kiki 🐒 bất cứ lúc nào nếu cần giải thích thêm.',
-    cta: 'Bắt đầu thôi!',
+    title: 'Step 3 — Revise smarter',
+    desc: 'Use Flashcards or MCQ quizzes to test yourself. Ask Kiki 🐒 anytime you need a deeper explanation.',
+    cta: "Let's go!",
     color: '#4ADE80',
     bg: 'rgba(74,222,128,0.1)',
     border: 'rgba(74,222,128,0.25)',
@@ -122,7 +122,7 @@ export default function OnboardingModal({ onDismiss }) {
 
         {step === 0 && (
           <button className="onboarding-skip" onClick={onDismiss} type="button">
-            Bỏ qua
+            Skip
           </button>
         )}
       </div>

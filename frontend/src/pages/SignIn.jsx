@@ -30,6 +30,9 @@ const SignIn = () => {
   return (
     <div className="auth-page">
       <AuthForm error={error} isSubmitting={isSubmitting} mode="signin" onSubmit={handleSubmit} />
+      <p className="auth-footer" style={{ textAlign: 'center' }}>
+        <Link to="/forgot-password" style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Forgot password?</Link>
+      </p>
       <p className="auth-footer">
         Don&apos;t have an account?{' '}
         <Link to="/signup">Create one</Link>

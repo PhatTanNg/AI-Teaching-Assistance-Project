@@ -27,6 +27,12 @@ const SignUp = () => {
   return (
     <div className="auth-page">
       <AuthForm error={error} isSubmitting={isSubmitting} mode="signup" onSubmit={handleSubmit} />
+      <p className="auth-footer" style={{ textAlign: 'center', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+        By signing up, you agree to our{' '}
+        <Link to="/terms" style={{ color: 'var(--text-muted)' }}>Terms of Service</Link>
+        {' '}and{' '}
+        <Link to="/privacy" style={{ color: 'var(--text-muted)' }}>Privacy Policy</Link>.
+      </p>
       <p className="auth-footer">
         Already have an account? <Link to="/signin">Sign in</Link>
       </p>

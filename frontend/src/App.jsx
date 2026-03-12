@@ -13,6 +13,10 @@ import { useAuth } from './context/AuthContext.jsx';
 import Home from './pages/Home.jsx';
 import SignIn from './pages/SignIn.jsx';
 import SignUp from './pages/SignUp.jsx';
+import ForgotPassword from './pages/ForgotPassword.jsx';
+import ResetPassword from './pages/ResetPassword.jsx';
+import Privacy from './pages/Privacy.jsx';
+import Terms from './pages/Terms.jsx';
 import Transcribe from './pages/Transcribe.jsx';
 import Transcripts from './pages/Transcripts.jsx';
 import Keywords from './pages/Keywords.jsx';
@@ -129,7 +133,11 @@ function PublicLayout() {
         <Outlet />
       </div>
       <footer className="app-public__footer" role="contentinfo">
-        Built to help students capture every lecture with clarity and confidence.
+        <span>Built to help students capture every lecture with clarity and confidence.</span>
+        <span style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+          <Link to="/privacy" style={{ color: 'var(--text-muted)', textDecoration: 'none', fontSize: '0.8rem' }}>Privacy Policy</Link>
+          <Link to="/terms" style={{ color: 'var(--text-muted)', textDecoration: 'none', fontSize: '0.8rem' }}>Terms of Service</Link>
+        </span>
       </footer>
     </div>
   );
@@ -148,6 +156,10 @@ export default function App() {
           <Route path="/" element={<Home />} />
           <Route path="/signin" element={<SignIn />} />
           <Route path="/signup" element={<SignUp />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/privacy" element={<Privacy />} />
+          <Route path="/terms" element={<Terms />} />
         </Route>
 
         {/* Authenticated pages (sidebar layout) */}
