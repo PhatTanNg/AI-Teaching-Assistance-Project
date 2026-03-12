@@ -16,25 +16,40 @@ export default function MonkeyChat() {
   const [isStreaming, setIsStreaming]  = useState(false);
   const [lectures, setLectures]       = useState(null); // null = not fetched yet
 
-  const messagesEndRef = useRef(null);
-  const inputRef       = useRef(null);
-  const abortRef       = useRef(null);
+  const messagesEndRef    = useRef(null);
+  const inputRef          = useRef(null);
+  const abortRef          = useRef(null);
+  const lecturesFetchRef  = useRef(null); // stores in-flight fetch promise
+  const lecturesRef       = useRef(null); // always-current mirror of lectures state
+
+  // Keep ref in sync with state
+  useEffect(() => { lecturesRef.current = lectures; }, [lectures]);
 
   // Fetch all transcripts on first open (library mode)
   const toggleOpen = useCallback(() => {
     const opening = !isOpen;
     setIsOpen(opening);
-    if (opening && token && lectures === null) {
-      getTranscripts(token)
-        .then(data => setLectures(data || []))
-        .catch(() => setLectures([]));
+    if (opening && token && lecturesRef.current === null && !lecturesFetchRef.current) {
+      lecturesFetchRef.current = getTranscripts(token)
+        .then(data => {
+          const result = Array.isArray(data) ? data : [];
+          console.log('[MonkeyChat] Loaded', result.length, 'transcripts');
+          setLectures(result);
+          return result;
+        })
+        .catch(err => {
+          console.warn('[MonkeyChat] getTranscripts failed:', err?.message);
+          setLectures([]);
+          return [];
+        });
     }
-  }, [isOpen, token, lectures]);
+  }, [isOpen, token]);
 
-  // Build compact lecture library string
+  // Build compact lecture library string (reads from ref — always fresh)
   const buildLibraryContext = useCallback(() => {
-    if (!lectures?.length) return null;
-    const library = lectures
+    const lecs = lecturesRef.current;
+    if (!lecs?.length) return null;
+    const library = lecs
       .slice()
       .sort((a, b) => new Date(b.transcribedAt) - new Date(a.transcribedAt))
       .map((tr, i) => {
@@ -43,7 +58,7 @@ export default function MonkeyChat() {
       })
       .join('\n\n');
     return { allLectures: library };
-  }, [lectures]);
+  }, []);
 
   // Priority: single-lecture from ChatContext > library > null
   const buildChatContext = useCallback(() => {
@@ -97,8 +112,14 @@ export default function MonkeyChat() {
     setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
 
     try {
+      // If transcripts are still loading, wait for them before building context
+      if (lecturesRef.current === null && lecturesFetchRef.current) {
+        await lecturesFetchRef.current;
+      }
+
       const apiMessages = history.map(m => ({ role: m.role, content: m.content }));
       const chatCtx = buildChatContext();
+      console.log('[MonkeyChat] context type:', chatCtx ? Object.keys(chatCtx).join(',') : 'none');
       const res = await streamChat(token, apiMessages, chatCtx ?? {});
 
       if (!res.ok) throw new Error('Stream request failed');
@@ -154,7 +175,7 @@ export default function MonkeyChat() {
       setIsStreaming(false);
       abortRef.current = null;
     }
-  }, [input, isStreaming, messages, token, buildChatContext]);
+  }, [input, isStreaming, messages, token, buildChatContext]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
