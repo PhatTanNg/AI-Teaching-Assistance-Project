@@ -1,5 +1,6 @@
 import { SpeechClient } from '@google-cloud/speech';
 import FormData from 'form-data';
+import axios from 'axios';
 
 const ALLOWED_TYPES = [
   'audio/wav', 'audio/x-wav', 'audio/flac', 'audio/mp3', 'audio/mpeg',
@@ -44,9 +45,7 @@ export const transcribeWithWhisper = async (req, res) => {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) return res.status(500).json({ error: 'OpenAI API key not configured' });
 
-    // Build multipart form using form-data package
     const language = req.body?.language || 'vi'; // vi | en | ga
-    const form = new FormData();
     // Determine extension from mimetype
     const extMap = {
       'audio/mp3': 'mp3', 'audio/mpeg': 'mp3',
@@ -58,25 +57,22 @@ export const transcribeWithWhisper = async (req, res) => {
       'audio/amr': 'amr',
     };
     const ext = extMap[req.file.mimetype] || 'mp3';
+    const form = new FormData();
     form.append('file', req.file.buffer, { filename: `audio.${ext}`, contentType: req.file.mimetype });
     form.append('model', 'whisper-1');
     form.append('language', language);
 
-    const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-      method: 'POST',
+    const { data } = await axios.post('https://api.openai.com/v1/audio/transcriptions', form, {
       headers: { Authorization: `Bearer ${apiKey}`, ...form.getHeaders() },
-      body: form,
     });
 
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error('Whisper error:', response.status, errText);
-      return res.status(502).json({ error: 'Whisper transcription failed', details: errText });
-    }
-
-    const data = await response.json();
     return res.json({ transcript: data.text || '' });
   } catch (err) {
+    if (err.response) {
+      const details = JSON.stringify(err.response.data);
+      console.error('Whisper error:', err.response.status, details);
+      return res.status(502).json({ error: 'Whisper transcription failed', details });
+    }
     console.error('Whisper error:', err.message);
     return res.status(500).json({ error: 'Transcription failed', details: err.message });
   }

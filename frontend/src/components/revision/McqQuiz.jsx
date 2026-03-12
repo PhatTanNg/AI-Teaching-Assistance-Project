@@ -58,14 +58,6 @@ export default function McqQuiz({ questions, onSubmitBatch, isLoading }) {
     [questions, index],
   );
 
-  // Debug logging — remove once confirmed
-  useEffect(() => {
-    if (currentQuestion) {
-      console.log('[MCQ] currentQuestion:', JSON.stringify(currentQuestion, null, 2));
-      console.log('[MCQ] options type:', typeof currentQuestion.options, Array.isArray(currentQuestion.options) ? 'array' : 'not-array');
-      console.log('[MCQ] normalized:', normalizeOptions(currentQuestion.options));
-    }
-  }, [currentQuestion]);
 
   if (!currentQuestion) {
     return (

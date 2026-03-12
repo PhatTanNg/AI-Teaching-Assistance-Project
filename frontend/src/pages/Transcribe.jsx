@@ -84,6 +84,7 @@ const Transcribe = () => {
 
   useEffect(() => { tokenRef.current = token; }, [token]);
   useEffect(() => { autoCorrectRef.current = autoCorrect; }, [autoCorrect]);
+  useEffect(() => { isRecordingRef.current = isRecording; }, [isRecording]);
 
   const [isRecording, setIsRecording]                 = useState(false);
   const [rawTranscript, setRawTranscript]             = useState('');
@@ -99,6 +100,7 @@ const Transcribe = () => {
   const recognitionRef    = useRef(null);
   const demoIntervalRef   = useRef(null);
   const analysisTimerRef  = useRef(null);
+  const isRecordingRef    = useRef(false);
   const [isRealtimeStreaming] = useState(false);
 
   const [subject, setSubject]                       = useState('');
@@ -162,8 +164,15 @@ const Transcribe = () => {
       setIsRecording(false);
     };
 
+    let stopping = false;
+    recognition.onend = () => {
+      if (isRecordingRef.current && !stopping) {
+        try { recognition.start(); } catch (_) {}
+      }
+    };
+
     recognitionRef.current = recognition;
-    return () => { recognition.stop(); };
+    return () => { stopping = true; recognition.stop(); };
   }, [transcribeLang]); // intentionally excludes token + autoCorrect — use refs instead
 
   /* ── Demo mode ── */
