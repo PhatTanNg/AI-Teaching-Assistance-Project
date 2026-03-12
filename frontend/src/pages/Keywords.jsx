@@ -148,7 +148,7 @@ const Keywords = () => {
     <div className="page" style={{ width: '100%', maxWidth: '100%' }}>
       <div style={{ marginBottom: '1.5rem' }}>
         <h1>{t('keywords.title')}</h1>
-        <p className="card__subtitle">Edit keyword definitions for your lectures</p>
+        <p className="card__subtitle">{t('keywords.subtitle')}</p>
       </div>
 
       {error && (

@@ -404,7 +404,7 @@ const Profile = () => {
       {showAvatarPicker && (
         <div
           style={{
-            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+            position: 'fixed', inset: 0, background: 'transparent',
             display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: '1rem',
           }}
           onClick={() => setShowAvatarPicker(false)}

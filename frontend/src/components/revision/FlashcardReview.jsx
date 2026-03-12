@@ -1,16 +1,18 @@
 import { useMemo, useState } from 'react';
-
-const ratingButtons = [
-  { label: '😟', sublabel: 'Forgot', value: 1 },
-  { label: '😐', sublabel: 'Hard', value: 2 },
-  { label: '😊', sublabel: 'Good', value: 3 },
-  { label: '🤩', sublabel: 'Easy', value: 4 },
-];
+import { useLanguage } from '../../context/LanguageContext.jsx';
 
 export default function FlashcardReview({ cards, onRate, isLoading }) {
+  const { t } = useLanguage();
   const [activeIndex, setActiveIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [nextReviewDate, setNextReviewDate] = useState('');
+
+  const ratingButtons = [
+    { label: '😟', sublabel: t('revision.ratingForgot'), value: 1 },
+    { label: '😐', sublabel: t('revision.ratingHard'), value: 2 },
+    { label: '😊', sublabel: t('revision.ratingGood'), value: 3 },
+    { label: '🤩', sublabel: t('revision.ratingEasy'), value: 4 },
+  ];
 
   const total = cards?.length || 0;
   const currentCard = useMemo(() => (total > 0 ? cards[activeIndex] : null), [cards, activeIndex, total]);
@@ -26,8 +28,8 @@ export default function FlashcardReview({ cards, onRate, isLoading }) {
   if (!currentCard) {
     return (
       <section className="card revision-card">
-        <h2 className="revision-card__title">Flashcard Review</h2>
-        <p style={{ color: 'var(--text-muted)' }}>No flashcards generated yet. Select transcripts and click "Generate Flashcards" above.</p>
+        <h2 className="revision-card__title">{t('revision.flashcardTitle')}</h2>
+        <p style={{ color: 'var(--text-muted)' }}>{t('revision.noFlashcards')}</p>
       </section>
     );
   }
@@ -35,9 +37,9 @@ export default function FlashcardReview({ cards, onRate, isLoading }) {
   return (
     <section className="card revision-card">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-        <h2 className="revision-card__title">Flashcard Review</h2>
+        <h2 className="revision-card__title">{t('revision.flashcardTitle')}</h2>
         <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-          Card {activeIndex + 1} / {total}
+          {t('revision.cardLabel')} {activeIndex + 1} / {total}
         </span>
       </div>
 
@@ -49,15 +51,15 @@ export default function FlashcardReview({ cards, onRate, isLoading }) {
       <div className="flashcard-container" onClick={() => { if (!isLoading) setIsFlipped(prev => !prev); }}>
         <div className={`flashcard-inner ${isFlipped ? 'flashcard-inner--flipped' : ''}`}>
           <div className="flashcard-face flashcard-front">
-            <span className="flashcard-label">QUESTION</span>
+            <span className="flashcard-label">{t('revision.questionLabel')}</span>
             <p className="flashcard-text">{currentCard.front}</p>
-            <span className="flashcard-hint">Click to flip</span>
+            <span className="flashcard-hint">{t('revision.clickToFlip')}</span>
           </div>
           <div className="flashcard-face flashcard-back">
-            <span className="flashcard-label">ANSWER</span>
+            <span className="flashcard-label">{t('revision.answerLabel')}</span>
             <p className="flashcard-text">{currentCard.back}</p>
             {currentCard.source_ref && (
-              <span className="flashcard-source">Source: {currentCard.source_ref}</span>
+              <span className="flashcard-source">{t('revision.sourcePrefix')}: {currentCard.source_ref}</span>
             )}
           </div>
         </div>
@@ -67,7 +69,7 @@ export default function FlashcardReview({ cards, onRate, isLoading }) {
       {isFlipped && (
         <div className="flashcard-ratings">
           <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '0.5rem', textAlign: 'center' }}>
-            How well did you know this?
+            {t('revision.ratingPrompt')}
           </p>
           <div className="flashcard-ratings__buttons">
             {ratingButtons.map(item => (
@@ -83,7 +85,7 @@ export default function FlashcardReview({ cards, onRate, isLoading }) {
 
       {nextReviewDate && (
         <p style={{ textAlign: 'center', fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.75rem' }}>
-          Next review: {nextReviewDate}
+          {t('revision.nextReviewPrefix')}: {nextReviewDate}
         </p>
       )}
     </section>

@@ -481,7 +481,7 @@ const Transcribe = () => {
       {/* Header */}
       <div style={{ marginBottom: '1.5rem' }}>
         <h1>{t('transcribe.title')}</h1>
-        <p className="card__subtitle">Capture lectures, highlight keywords, and auto-generate summaries</p>
+        <p className="card__subtitle">{t('transcribe.subtitle')}</p>
       </div>
 
       {saveError && (

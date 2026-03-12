@@ -1,8 +1,12 @@
+import { useLanguage } from '../../context/LanguageContext.jsx';
+
 export default function BadgeDisplay({ badges }) {
+  const { t } = useLanguage();
+
   if (!badges || badges.length === 0) {
     return (
       <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-        No badges unlocked yet. Keep going!
+        {t('revision.noBadges')}
       </p>
     );
   }

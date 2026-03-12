@@ -5,6 +5,7 @@ import McqQuiz from '../components/revision/McqQuiz.jsx';
 import ProgressDashboard from '../components/revision/ProgressDashboard.jsx';
 import GenerationLoader from '../components/revision/GenerationLoader.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useLanguage } from '../context/LanguageContext.jsx';
 
 const apiBase = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5001';
 const tokenKey = 'aita_access_token';
@@ -27,6 +28,7 @@ const apiRequest = async (path, { method = 'GET', body } = {}) => {
 
 export default function RevisionModePage() {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [transcripts, setTranscripts] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
   const [difficulty, setDifficulty] = useState('medium');
@@ -117,8 +119,8 @@ export default function RevisionModePage() {
   return (
     <div className="page" style={{ width: '100%', maxWidth: '100%' }}>
       <div style={{ marginBottom: '1.5rem' }}>
-        <h1>Revision Mode</h1>
-        <p className="card__subtitle">Generate flashcards & MCQs from your transcripts, track your progress</p>
+        <h1>{t('revision.title')}</h1>
+        <p className="card__subtitle">{t('revision.subtitle')}</p>
       </div>
 
       {error && (

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { RotateCcw } from 'lucide-react';
+import { useLanguage } from '../../context/LanguageContext.jsx';
 
 const OPTION_KEYS = ['A', 'B', 'C', 'D'];
 
@@ -40,15 +41,8 @@ function getResultEmoji(pct) {
   return '💪';
 }
 
-function getResultMsg(pct) {
-  if (pct === 100) return 'Hoàn hảo! Bạn đã trả lời đúng tất cả!';
-  if (pct >= 80)  return 'Xuất sắc! Kiến thức rất vững!';
-  if (pct >= 60)  return 'Khá tốt! Ôn thêm một chút nữa nhé.';
-  if (pct >= 40)  return 'Cố lên! Hãy xem lại bài giảng.';
-  return 'Đừng nản — ôn lại và thử lại nào!';
-}
-
 export default function McqQuiz({ questions, onSubmitBatch, isLoading }) {
+  const { t } = useLanguage();
   const [index, setIndex] = useState(0);
   const [selected, setSelected] = useState('');
   const [feedback, setFeedback] = useState(null);
@@ -59,6 +53,14 @@ export default function McqQuiz({ questions, onSubmitBatch, isLoading }) {
     () => (questions?.length > 0 ? questions[index] : null),
     [questions, index],
   );
+
+  const getResultMsg = (pct) => {
+    if (pct === 100) return t('revision.resultMsgPerfect');
+    if (pct >= 80)  return t('revision.resultMsgExcellent');
+    if (pct >= 60)  return t('revision.resultMsgGood');
+    if (pct >= 40)  return t('revision.resultMsgOk');
+    return t('revision.resultMsgKeepGoing');
+  };
 
   const restart = () => {
     setIndex(0);
@@ -72,8 +74,8 @@ export default function McqQuiz({ questions, onSubmitBatch, isLoading }) {
   if (!currentQuestion && !done) {
     return (
       <section className="card revision-card">
-        <h2 className="revision-card__title">MCQ Quiz</h2>
-        <p style={{ color: 'var(--text-muted)' }}>No MCQs generated yet. Select transcripts and click "Generate MCQs" above.</p>
+        <h2 className="revision-card__title">{t('revision.mcqTitle')}</h2>
+        <p style={{ color: 'var(--text-muted)' }}>{t('revision.noMCQs')}</p>
       </section>
     );
   }
@@ -87,7 +89,7 @@ export default function McqQuiz({ questions, onSubmitBatch, isLoading }) {
 
     return (
       <section className="card revision-card">
-        <h2 className="revision-card__title">MCQ Quiz</h2>
+        <h2 className="revision-card__title">{t('revision.mcqTitle')}</h2>
 
         <div className="mcq-results">
           <div className="mcq-results__emoji">{emoji}</div>
@@ -95,7 +97,7 @@ export default function McqQuiz({ questions, onSubmitBatch, isLoading }) {
             <span className="mcq-results__num">{correctCount}</span>
             <span className="mcq-results__den">/{total}</span>
           </div>
-          <div className="mcq-results__pct">{pct}% correct</div>
+          <div className="mcq-results__pct">{pct}% {t('revision.correctSuffix')}</div>
           <p className="mcq-results__msg">{msg}</p>
 
           {/* Thin progress bar */}
@@ -107,7 +109,7 @@ export default function McqQuiz({ questions, onSubmitBatch, isLoading }) {
           </div>
 
           <button type="button" className="btn" onClick={restart} style={{ gap: '0.5rem' }}>
-            <RotateCcw size={15} /> Làm lại
+            <RotateCcw size={15} /> {t('common.retry')}
           </button>
         </div>
       </section>
@@ -142,9 +144,9 @@ export default function McqQuiz({ questions, onSubmitBatch, isLoading }) {
   return (
     <section className="card revision-card">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-        <h2 className="revision-card__title">MCQ Quiz</h2>
+        <h2 className="revision-card__title">{t('revision.mcqTitle')}</h2>
         <span className="mcq-score">
-          {correctCount}/{questions.length} correct
+          {correctCount}/{questions.length} {t('revision.correctSuffix')}
         </span>
       </div>
 
@@ -190,7 +192,7 @@ export default function McqQuiz({ questions, onSubmitBatch, isLoading }) {
 
       {feedback && (
         <div className={`mcq-feedback ${feedback.is_correct ? 'mcq-feedback--correct' : 'mcq-feedback--wrong'}`}>
-          <strong>{feedback.is_correct ? '✓ Correct!' : '✗ Incorrect'}</strong>
+          <strong>{feedback.is_correct ? t('revision.correctFeedback') : t('revision.incorrectFeedback')}</strong>
           {feedback.explanation && <p style={{ margin: '0.5rem 0 0' }}>{feedback.explanation}</p>}
         </div>
       )}
@@ -198,11 +200,11 @@ export default function McqQuiz({ questions, onSubmitBatch, isLoading }) {
       <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
         {!feedback ? (
           <button type="button" className="btn" onClick={submitAnswer} disabled={!selected || isLoading}>
-            Submit Answer
+            {t('revision.submitAnswer')}
           </button>
         ) : (
           <button type="button" className="btn" onClick={nextQuestion} disabled={isLoading}>
-            {isLastQuestion ? 'Xem kết quả →' : 'Next Question →'}
+            {isLastQuestion ? t('revision.viewResults') : t('revision.nextQuestion')}
           </button>
         )}
       </div>

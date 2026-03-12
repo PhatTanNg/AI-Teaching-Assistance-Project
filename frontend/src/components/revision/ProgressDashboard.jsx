@@ -1,6 +1,8 @@
+import { useLanguage } from '../../context/LanguageContext.jsx';
 import BadgeDisplay from './BadgeDisplay.jsx';
 
 export default function ProgressDashboard({ progress, weakTopics, onReviewWeakTopics }) {
+  const { t } = useLanguage();
   const accuracy = progress?.accuracy || 0;
   const xp = progress?.xp_points || 0;
   const xpMax = Math.max(xp, 1000); // simple bar scale
@@ -8,32 +10,32 @@ export default function ProgressDashboard({ progress, weakTopics, onReviewWeakTo
 
   return (
     <section className="card revision-card progress-dashboard">
-      <h2 className="revision-card__title">Your Progress</h2>
+      <h2 className="revision-card__title">{t('revision.progressTitle')}</h2>
 
       {/* Stat cards */}
       <div className="progress-stats">
         <div className="progress-stat">
           <span className="progress-stat__value">{progress?.transcripts_studied || 0}</span>
-          <span className="progress-stat__label">Studied</span>
+          <span className="progress-stat__label">{t('revision.studied')}</span>
         </div>
         <div className="progress-stat">
           <span className="progress-stat__value">{progress?.total_flashcards || 0}</span>
-          <span className="progress-stat__label">Flashcards</span>
+          <span className="progress-stat__label">{t('revision.flashcards')}</span>
         </div>
         <div className="progress-stat">
           <span className="progress-stat__value">{progress?.total_mcqs_done || 0}</span>
-          <span className="progress-stat__label">MCQs Done</span>
+          <span className="progress-stat__label">{t('revision.mcqsDone')}</span>
         </div>
         <div className="progress-stat">
           <span className="progress-stat__value">{accuracy}%</span>
-          <span className="progress-stat__label">Accuracy</span>
+          <span className="progress-stat__label">{t('revision.accuracy')}</span>
         </div>
       </div>
 
       {/* XP Bar */}
       <div className="xp-section">
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
-          <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>XP Points</span>
+          <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{t('revision.xpPoints')}</span>
           <span style={{ fontSize: '0.85rem', color: 'var(--accent-cyan)', fontFamily: 'var(--font-mono)' }}>{xp}</span>
         </div>
         <div className="xp-bar">
@@ -44,13 +46,13 @@ export default function ProgressDashboard({ progress, weakTopics, onReviewWeakTo
       {/* Streak */}
       <div className="streak-section">
         <span className="streak-flame">🔥</span>
-        <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{streak} day streak</span>
+        <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{streak} {t('revision.dayStreakSuffix')}</span>
       </div>
 
       {/* Weak Topics */}
       <div className="weak-topics">
         <h3 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.75rem' }}>
-          Weak Topics
+          {t('revision.weakTopics')}
         </h3>
         {weakTopics?.length ? (
           <div style={{ display: 'grid', gap: '0.5rem' }}>
@@ -67,17 +69,17 @@ export default function ProgressDashboard({ progress, weakTopics, onReviewWeakTo
             ))}
           </div>
         ) : (
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>No weak topics yet — keep studying!</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{t('revision.noWeakTopics')}</p>
         )}
         <button type="button" className="btn btn--ghost" style={{ marginTop: '0.75rem' }}
           onClick={onReviewWeakTopics}>
-          Review Weak Topics
+          {t('revision.reviewWeak')}
         </button>
       </div>
 
       {/* Badges */}
       <div style={{ marginTop: '1.5rem' }}>
-        <h3 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.75rem' }}>Badges</h3>
+        <h3 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.75rem' }}>{t('revision.badges')}</h3>
         <BadgeDisplay badges={progress?.badges || []} />
       </div>
     </section>

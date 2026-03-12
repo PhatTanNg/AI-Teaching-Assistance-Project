@@ -110,7 +110,7 @@ const Transcripts = () => {
     <div className="page" style={{ width: '100%', maxWidth: '100%' }}>
       <div style={{ marginBottom: '1.5rem' }}>
         <h1>{t('transcripts.title')}</h1>
-        <p className="card__subtitle">Access your transcripts and auto-generated summaries</p>
+        <p className="card__subtitle">{t('transcripts.subtitle')}</p>
       </div>
 
       {error && (
@@ -168,7 +168,7 @@ const Transcripts = () => {
               </p>
 
               {tr.summary && (
-                <div className="transcript-card__summary-badge">✓ Summary available</div>
+                <div className="transcript-card__summary-badge">{t('transcripts.summaryBadge')}</div>
               )}
 
               <Button onClick={() => viewTranscript(tr)} className="btn btn--ghost" style={{ width: '100%' }}>
@@ -213,20 +213,27 @@ const Transcripts = () => {
 
               <Tabs defaultValue="transcript" style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                 <TabsList style={{
-                  background: 'var(--bg-elevated)', border: '1px solid var(--glass-border)',
-                  borderRadius: '0.75rem', padding: '0.25rem', width: '100%',
-                  display: 'grid', gridTemplateColumns: '1fr 1fr', flexShrink: 0
+                  background: 'var(--bg-elevated)',
+                  border: '1px solid var(--card-border)',
+                  borderRadius: '0.75rem',
+                  padding: '0.25rem',
+                  width: '100%',
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  flexShrink: 0,
+                  gap: '0.25rem',
                 }}>
-                  <TabsTrigger value="transcript" style={{ borderRadius: '0.5rem', gap: '0.4rem', fontSize: '0.83rem' }}>
+                  <TabsTrigger value="transcript">
                     <AlignLeft size={13} /> {t('transcripts.transcriptLabel')}
                   </TabsTrigger>
-                  <TabsTrigger value="summary" style={{ borderRadius: '0.5rem', gap: '0.4rem', fontSize: '0.83rem' }}>
+                  <TabsTrigger value="summary">
                     <Sparkles size={13} />
                     {t('transcripts.summaryLabel')}
                     {!selectedTranscript.summary && (
                       <span style={{
                         fontSize: '0.65rem', background: 'rgba(252,211,77,0.2)',
-                        color: 'var(--accent-yellow)', padding: '1px 5px', borderRadius: '999px'
+                        color: 'var(--accent-yellow)', padding: '1px 5px', borderRadius: '999px',
+                        marginLeft: '0.25rem',
                       }}>...</span>
                     )}
                   </TabsTrigger>
@@ -258,7 +265,7 @@ const Transcripts = () => {
                           onClick={() => startEdit('rawTranscript', selectedTranscript.rawTranscript)}
                           size="sm" className="btn btn--ghost btn--sm"
                         >
-                          <Edit2 size={13} /> Edit
+                          <Edit2 size={13} /> {t('transcripts.editTranscript')}
                         </Button>
                       </div>
                       <div className="transcript-dialog__text-box" style={{ flex: 1 }}>
@@ -280,7 +287,7 @@ const Transcripts = () => {
                       />
                       <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', flexShrink: 0 }}>
                         <Button onClick={handleSaveEdit} disabled={isSaving} className="btn btn--sm">
-                          <Save size={14} /> {isSaving ? 'Saving…' : 'Save'}
+                          <Save size={14} /> {isSaving ? t('common.loading') : t('transcripts.saveEdit')}
                         </Button>
                         <Button onClick={cancelEdit} className="btn btn--ghost btn--sm">
                           <X size={14} />
@@ -294,7 +301,7 @@ const Transcripts = () => {
                           onClick={() => startEdit('summary', selectedTranscript.summary)}
                           size="sm" className="btn btn--ghost btn--sm"
                         >
-                          <Edit2 size={13} /> Edit
+                          <Edit2 size={13} /> {t('transcripts.editSummary')}
                         </Button>
                       </div>
                       <div className="transcript-dialog__summary-box" style={{ flex: 1 }}>
@@ -305,10 +312,10 @@ const Transcripts = () => {
                     <div className="transcript-dialog__generating">
                       <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>✨</div>
                       <p style={{ fontWeight: 600, marginBottom: '0.25rem', color: 'var(--text-primary)' }}>
-                        Summary đang được tạo…
+                        {t('transcripts.summaryGenerating')}
                       </p>
                       <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                        Tải lại trang sau ít phút để xem kết quả.
+                        {t('transcripts.summaryGeneratingDesc')}
                       </p>
                     </div>
                   )}
@@ -317,7 +324,7 @@ const Transcripts = () => {
             </>
           ) : (
             <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-              No transcript selected.
+              {t('transcripts.noTranscriptSelected')}
             </div>
           )}
         </DialogContent>

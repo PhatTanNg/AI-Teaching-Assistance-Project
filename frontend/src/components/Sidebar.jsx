@@ -23,6 +23,8 @@ export default function Sidebar({ collapsed = false, onCollapse }) {
 
   const initials = (user?.displayName?.[0] || user?.username?.[0] || '?').toUpperCase();
   const displayName = user?.displayName ?? user?.username;
+  const isImageAvatar = user?.avatarUrl && (user.avatarUrl.startsWith('data:') || user.avatarUrl.startsWith('http'));
+  const isEmojiAvatar = user?.avatarUrl && !isImageAvatar;
 
   return (
     <>
@@ -86,7 +88,11 @@ export default function Sidebar({ collapsed = false, onCollapse }) {
               aria-label={`${t('nav.profile')}: ${displayName}`}
               style={{ textDecoration: 'none' }}
             >
-              {initials}
+              {isImageAvatar ? (
+                <img src={user.avatarUrl} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+              ) : isEmojiAvatar ? (
+                <span style={{ fontSize: '1.3rem', lineHeight: 1 }}>{user.avatarUrl}</span>
+              ) : initials}
             </NavLink>
             {!collapsed && (
               <NavLink to="/profile" style={{ textDecoration: 'none', flex: 1, minWidth: 0 }}>

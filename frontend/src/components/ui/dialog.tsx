@@ -38,13 +38,13 @@ function DialogOverlay({
     <DialogPrimitive.Overlay
       data-slot="dialog-overlay"
       className={cn(
-        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50",
+        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50",
         className,
       )}
       style={{
         position: 'fixed',
         inset: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        backgroundColor: 'transparent',
         zIndex: 50
       }}
       {...props}
@@ -71,23 +71,51 @@ function DialogContent({
           top: '50%',
           left: '50%',
           transform: 'translate(-50%, -50%)',
-          backgroundColor: 'white',
+          backgroundColor: 'var(--bg-secondary)',
           zIndex: 51,
-          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
-          borderRadius: '8px',
-          border: '1px solid #e5e7eb',
-          padding: '24px',
+          boxShadow: '0 24px 64px rgba(0, 0, 0, 0.5)',
+          borderRadius: '1.25rem',
+          border: '1px solid var(--card-border)',
+          padding: '1.5rem',
           maxWidth: '90vw',
           maxHeight: '85vh',
-          overflowY: 'auto',
-          display: 'grid',
-          gap: '16px'
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
         }}
         {...props}
       >
         {children}
-        <DialogPrimitive.Close className="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4">
-          <XIcon />
+        <DialogPrimitive.Close
+          style={{
+            position: 'absolute',
+            top: '1rem',
+            right: '1rem',
+            background: 'transparent',
+            border: 'none',
+            cursor: 'pointer',
+            color: 'var(--text-muted)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: '0.5rem',
+            padding: '0.3rem',
+            lineHeight: 1,
+            zIndex: 1,
+            transition: 'color 0.15s, background 0.15s',
+          }}
+          onMouseEnter={e => {
+            const btn = e.currentTarget as HTMLButtonElement;
+            btn.style.color = 'var(--text-primary)';
+            btn.style.background = 'var(--bg-elevated)';
+          }}
+          onMouseLeave={e => {
+            const btn = e.currentTarget as HTMLButtonElement;
+            btn.style.color = 'var(--text-muted)';
+            btn.style.background = 'transparent';
+          }}
+        >
+          <XIcon width={16} height={16} />
           <span className="sr-only">Close</span>
         </DialogPrimitive.Close>
       </DialogPrimitive.Content>

@@ -2653,6 +2653,34 @@ html.light .transcript-card:hover {
   flex: 1;
 }
 
+/* Radix Tabs — active trigger indicator (Tailwind not available) */
+[data-slot="tabs-trigger"] {
+  padding: 0.45rem 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.83rem;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  transition: color 0.15s, background 0.15s;
+  white-space: nowrap;
+}
+[data-slot="tabs-trigger"][data-state="active"] {
+  background: rgba(110, 231, 247, 0.12) !important;
+  color: var(--accent-primary) !important;
+  font-weight: 600;
+}
+[data-slot="tabs-trigger"][data-state="inactive"] {
+  color: var(--text-muted);
+}
+[data-slot="tabs-trigger"]:hover[data-state="inactive"] {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.05);
+}
+
 /* Full-screen dialog on mobile */
 @media (max-width: 640px) {
   .transcript-dialog {
