@@ -3,7 +3,6 @@ import { Routes, Route, Navigate, Outlet, Link } from 'react-router-dom';
 import { useTheme } from 'next-themes';
 import { Moon, Sun } from 'lucide-react';
 import Sidebar from './components/Sidebar.jsx';
-import Mascot from './components/Mascot.jsx';
 import MonkeyChat from './components/MonkeyChat.jsx';
 import { Toaster } from './components/ui/sonner';
 import OnboardingModal, { useOnboarding } from './components/OnboardingModal.jsx';
@@ -186,8 +185,6 @@ export default function App() {
     <>
       <a href="#main-content" className="skip-link">Skip to main content</a>
       <ThemeTransition />
-      {/* Mascot: desktop only — hidden on mobile via CSS */}
-      <div className="desktop-only"><Mascot /></div>
       <Routes>
         {/* Public pages (no sidebar) */}
         <Route element={<PublicLayout />}>
