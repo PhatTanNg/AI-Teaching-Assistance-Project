@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTheme } from 'next-themes';
 import { Moon, Sun, LogOut, Trash2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -31,6 +31,7 @@ const Profile = () => {
   // Avatar picker
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   const [isSavingAvatar, setIsSavingAvatar] = useState(false);
+  const fileInputRef = useRef(null);
 
   // Account deletion
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -83,10 +84,10 @@ const Profile = () => {
     }
   };
 
-  const handleAvatarSelect = async (emoji) => {
+  const handleAvatarSelect = async (avatarValue) => {
     setIsSavingAvatar(true);
     try {
-      await apiClient('/api/users/me', { method: 'PUT', token, data: { displayName: user.displayName ?? user.username, avatarUrl: emoji } });
+      await apiClient('/api/users/me', { method: 'PUT', token, data: { displayName: user.displayName ?? user.username, avatarUrl: avatarValue } });
       await refreshProfile();
       setShowAvatarPicker(false);
     } catch {
@@ -94,6 +95,30 @@ const Profile = () => {
     } finally {
       setIsSavingAvatar(false);
     }
+  };
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 96;
+      canvas.height = 96;
+      const ctx = canvas.getContext('2d');
+      // center-crop to square
+      const size = Math.min(img.width, img.height);
+      const sx = (img.width - size) / 2;
+      const sy = (img.height - size) / 2;
+      ctx.drawImage(img, sx, sy, size, size, 0, 0, 96, 96);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+      URL.revokeObjectURL(objectUrl);
+      handleAvatarSelect(dataUrl);
+    };
+    img.src = objectUrl;
+    // reset input so same file can be re-selected
+    e.target.value = '';
   };
 
   const handleDeleteAccount = async () => {
@@ -119,8 +144,9 @@ const Profile = () => {
   }
 
   const createdAt = user.createdAt ? new Date(user.createdAt).toLocaleDateString() : '—';
-  const avatarDisplay = user.avatarUrl || (user.displayName?.[0] || user.username?.[0] || '?').toUpperCase();
-  const isEmojiAvatar = user.avatarUrl && user.avatarUrl.length <= 4;
+  const isImageUrl = user.avatarUrl && (user.avatarUrl.startsWith('data:') || user.avatarUrl.startsWith('http'));
+  const isEmojiAvatar = user.avatarUrl && !isImageUrl;
+  const avatarInitial = (user.displayName?.[0] || user.username?.[0] || '?').toUpperCase();
 
   return (
     <div className="page">
@@ -141,11 +167,16 @@ const Profile = () => {
                 fontSize: isEmojiAvatar ? '1.6rem' : '1.3rem',
                 fontWeight: 700, cursor: 'pointer', flexShrink: 0,
                 color: 'var(--accent-primary)', transition: 'border-color 0.2s',
+                overflow: 'hidden', padding: 0, outline: 'none',
               }}
               onMouseOver={e => e.currentTarget.style.borderColor = 'var(--accent-primary)'}
               onMouseOut={e => e.currentTarget.style.borderColor = 'var(--card-border)'}
             >
-              {avatarDisplay}
+              {isImageUrl ? (
+                <img src={user.avatarUrl} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+              ) : (
+                isEmojiAvatar ? user.avatarUrl : avatarInitial
+              )}
             </button>
             <div>
               <h2 className="card__title">{t('profile.title')}</h2>
@@ -381,12 +412,39 @@ const Profile = () => {
           <div
             style={{
               background: 'var(--bg-elevated)', borderRadius: '1rem', padding: '1.5rem',
-              border: '1px solid var(--card-border)', maxWidth: '360px', width: '100%',
+              border: '1px solid var(--card-border)', maxWidth: '340px', width: '100%',
             }}
             onClick={e => e.stopPropagation()}
           >
             <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '1rem' }}>{t('profile.avatarPickerTitle')}</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: '0.5rem' }}>
+
+            {/* Upload photo button */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              style={{ display: 'none' }}
+              onChange={handleFileUpload}
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isSavingAvatar}
+              style={{
+                width: '100%', padding: '0.6rem 1rem', marginBottom: '1rem',
+                borderRadius: '0.5rem', border: '1px dashed var(--card-border)',
+                background: 'transparent', color: 'var(--text-secondary)',
+                cursor: 'pointer', fontSize: '0.875rem', display: 'flex',
+                alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
+                outline: 'none',
+              }}
+              onMouseOver={e => { e.currentTarget.style.borderColor = 'var(--accent-primary)'; e.currentTarget.style.color = 'var(--accent-primary)'; }}
+              onMouseOut={e => { e.currentTarget.style.borderColor = 'var(--card-border)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
+            >
+              📷 {t('profile.uploadPhoto')}
+            </button>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem' }}>
               {PRESET_AVATARS.map((emoji) => (
                 <button
                   key={emoji}
@@ -394,11 +452,11 @@ const Profile = () => {
                   onClick={() => handleAvatarSelect(emoji)}
                   disabled={isSavingAvatar}
                   style={{
-                    fontSize: '1.6rem', padding: '0.4rem', borderRadius: '0.5rem',
+                    fontSize: '2rem', padding: '0.5rem', borderRadius: '0.5rem',
                     border: user.avatarUrl === emoji ? '2px solid var(--accent-primary)' : '2px solid transparent',
                     background: user.avatarUrl === emoji ? 'var(--bg-secondary)' : 'transparent',
                     cursor: 'pointer', transition: 'background 0.15s',
-                    minHeight: '44px', minWidth: '44px',
+                    outline: 'none', aspectRatio: '1',
                   }}
                   onMouseOver={e => e.currentTarget.style.background = 'var(--bg-secondary)'}
                   onMouseOut={e => e.currentTarget.style.background = user.avatarUrl === emoji ? 'var(--bg-secondary)' : 'transparent'}

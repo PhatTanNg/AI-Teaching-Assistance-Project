@@ -16,7 +16,7 @@ const SignUp = () => {
         method: 'POST',
         data: { username, email, password, displayName },
       });
-      navigate('/signin', { replace: true, state: { fromSignUp: true } });
+      navigate('/verify-email', { replace: true });
     } catch (err) {
       setError(err.payload?.message ?? 'Unable to sign up. Please try again.');
     } finally {

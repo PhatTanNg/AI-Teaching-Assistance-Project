@@ -15,6 +15,7 @@ import SignIn from './pages/SignIn.jsx';
 import SignUp from './pages/SignUp.jsx';
 import ForgotPassword from './pages/ForgotPassword.jsx';
 import ResetPassword from './pages/ResetPassword.jsx';
+import VerifyEmail from './pages/VerifyEmail.jsx';
 import Privacy from './pages/Privacy.jsx';
 import Terms from './pages/Terms.jsx';
 import Transcribe from './pages/Transcribe.jsx';
@@ -28,9 +29,46 @@ function AppLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const sidebarWidth = sidebarCollapsed ? 'var(--sidebar-collapsed)' : 'var(--sidebar-width)';
   const { show: showOnboarding, dismiss: dismissOnboarding } = useOnboarding();
+  const { user, token } = useAuth();
+  const [resendingVerify, setResendingVerify] = useState(false);
+  const [verifySent, setVerifySent] = useState(false);
+
+  const handleResendVerify = async () => {
+    if (!user?.email || resendingVerify) return;
+    setResendingVerify(true);
+    try {
+      await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001'}/api/auth/resend-verification`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: user.email }),
+      });
+      setVerifySent(true);
+      setTimeout(() => setVerifySent(false), 5000);
+    } finally {
+      setResendingVerify(false);
+    }
+  };
 
   return (
     <div className="app-layout">
+      {user && user.emailVerified === false && (
+        <div className="email-verify-banner">
+          <span>
+            ⚠️ Please verify your email address.
+            {verifySent ? (
+              <span style={{ marginLeft: '0.5rem', opacity: 0.8 }}>Email sent!</span>
+            ) : (
+              <button
+                onClick={handleResendVerify}
+                disabled={resendingVerify}
+                style={{ marginLeft: '0.5rem', background: 'none', border: 'none', textDecoration: 'underline', cursor: 'pointer', color: 'inherit', fontWeight: 600, padding: 0 }}
+              >
+                {resendingVerify ? 'Sending...' : 'Resend'}
+              </button>
+            )}
+          </span>
+        </div>
+      )}
       <Sidebar collapsed={sidebarCollapsed} onCollapse={setSidebarCollapsed} />
       <main
         id="main-content"
@@ -158,6 +196,7 @@ export default function App() {
           <Route path="/signup" element={<SignUp />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/verify-email" element={<VerifyEmail />} />
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/terms" element={<Terms />} />
         </Route>

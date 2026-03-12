@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 
 const AuthForm = ({ mode = 'signin', onSubmit, isSubmitting, error }) => {
   const isSignUp = mode === 'signup';
@@ -60,6 +61,18 @@ const AuthForm = ({ mode = 'signin', onSubmit, isSubmitting, error }) => {
         placeholder="Your secure password" value={formValues.password}
         onChange={handleChange} required className="form-input"
         autoComplete={isSignUp ? 'new-password' : 'current-password'} />
+
+      {isSignUp && (
+        <label style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start', cursor: 'pointer', marginTop: '0.25rem' }}>
+          <input type="checkbox" required style={{ marginTop: '3px', accentColor: 'var(--accent-primary)', flexShrink: 0 }} />
+          <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+            I agree to the{' '}
+            <Link to="/terms" style={{ color: 'var(--text-secondary)' }}>Terms of Service</Link>
+            {' '}and{' '}
+            <Link to="/privacy" style={{ color: 'var(--text-secondary)' }}>Privacy Policy</Link>
+          </span>
+        </label>
+      )}
 
       {error && <p className="form-error" role="alert">{error}</p>}
 

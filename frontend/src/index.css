@@ -536,6 +536,26 @@ html.light .announcement-banner {
   border-radius: 0.4rem;
   transition: color var(--transition-fast), background var(--transition-fast);
 }
+.email-verify-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 200;
+  background: #92400e;
+  color: #fef3c7;
+  font-size: 0.82rem;
+  text-align: center;
+  padding: 0.4rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+html.light .email-verify-banner {
+  background: #fef3c7;
+  color: #78350f;
+}
 .announcement-banner__close:hover {
   color: var(--text-primary);
   background: var(--glass-border);

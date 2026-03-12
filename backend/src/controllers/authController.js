@@ -4,11 +4,20 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import Session from '../models/Session.js';
 import PasswordResetToken from '../models/PasswordResetToken.js';
+import EmailVerificationToken from '../models/EmailVerificationToken.js';
 import nodemailer from 'nodemailer';
 
 const ACCESS_TOKEN_TTL = '30m';
 const REFRESH_TOKE_TTL = 14 * 24 * 60 * 60 * 1000;
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
+const VERIFY_TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+const createMailTransporter = () => nodemailer.createTransport({
+  host: process.env.SMTP_HOST,
+  port: parseInt(process.env.SMTP_PORT || '587'),
+  secure: process.env.SMTP_SECURE === 'true',
+  auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+});
 
 export const signUp = async (req, res) => {
   try {
@@ -29,6 +38,49 @@ export const signUp = async (req, res) => {
       email,
       password: hashed,
     });
+
+    // Send verification email (non-blocking — don't fail signup if email fails)
+    try {
+      const rawToken = crypto.randomBytes(32).toString('hex');
+      await EmailVerificationToken.create({
+        userId: user._id,
+        token: rawToken,
+        expiresAt: new Date(Date.now() + VERIFY_TOKEN_TTL_MS),
+      });
+      const verifyUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/verify-email?token=${rawToken}`;
+      const transporter = createMailTransporter();
+      await transporter.sendMail({
+        from: `"AITA" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
+        to: user.email,
+        subject: 'Verify your AITA email',
+        html: `
+          <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
+            <h2 style="color: #6EE7F7; margin-bottom: 16px;">Welcome to AITA 🐒</h2>
+            <p style="color: #ccc; margin-bottom: 24px;">
+              Hi <strong>${user.displayName || user.username}</strong>,<br><br>
+              Thanks for signing up! Please verify your email address by clicking the button below.
+              This link expires in <strong>24 hours</strong>.
+            </p>
+            <a href="${verifyUrl}" style="
+              display: inline-block;
+              background: #6EE7F7;
+              color: #0D0F1A;
+              padding: 12px 28px;
+              border-radius: 8px;
+              text-decoration: none;
+              font-weight: 700;
+              margin-bottom: 24px;
+            ">Verify email</a>
+            <p style="color: #666; font-size: 0.85rem;">
+              If you didn't sign up for AITA, you can safely ignore this email.
+            </p>
+            <p style="color: #444; font-size: 0.8rem; margin-top: 24px;">— The AITA team 🐒</p>
+          </div>
+        `,
+      });
+    } catch (emailErr) {
+      console.error('Failed to send verification email:', emailErr);
+    }
 
     return res.status(201).json({
       id: user._id,
@@ -111,15 +163,7 @@ export const forgotPassword = async (req, res) => {
     const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${rawToken}`;
 
     // Send email via nodemailer
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: parseInt(process.env.SMTP_PORT || '587'),
-      secure: process.env.SMTP_SECURE === 'true',
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
-    });
+    const transporter = createMailTransporter();
 
     await transporter.sendMail({
       from: `"AITA" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
@@ -189,6 +233,90 @@ export const resetPassword = async (req, res) => {
     return res.status(200).json({ message: 'Password reset successfully' });
   } catch (err) {
     console.error('Error during password reset:', err);
+    return res.status(500).json({ message: 'Server error' });
+  }
+};
+
+export const verifyEmail = async (req, res) => {
+  try {
+    const { token } = req.query;
+    if (!token) {
+      return res.status(400).json({ message: 'Verification token is required' });
+    }
+
+    const verifyToken = await EmailVerificationToken.findOne({ token });
+    if (!verifyToken) {
+      return res.status(400).json({ message: 'Verification link is invalid or has expired' });
+    }
+    if (verifyToken.expiresAt < new Date()) {
+      await EmailVerificationToken.deleteOne({ _id: verifyToken._id });
+      return res.status(400).json({ message: 'Verification link has expired. Please request a new one.' });
+    }
+
+    await User.findByIdAndUpdate(verifyToken.userId, { emailVerified: true });
+    await EmailVerificationToken.deleteOne({ _id: verifyToken._id });
+
+    return res.status(200).json({ message: 'Email verified successfully' });
+  } catch (err) {
+    console.error('Error during email verification:', err);
+    return res.status(500).json({ message: 'Server error' });
+  }
+};
+
+export const resendVerification = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(200).json({ message: 'If that email exists, a verification link has been sent.' });
+    }
+
+    const user = await User.findOne({ email: email.toLowerCase().trim() });
+    // Always return 200 — don't reveal if email exists
+    if (!user || user.emailVerified) {
+      return res.status(200).json({ message: 'If that email exists, a verification link has been sent.' });
+    }
+
+    await EmailVerificationToken.deleteMany({ userId: user._id });
+
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    await EmailVerificationToken.create({
+      userId: user._id,
+      token: rawToken,
+      expiresAt: new Date(Date.now() + VERIFY_TOKEN_TTL_MS),
+    });
+
+    const verifyUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/verify-email?token=${rawToken}`;
+    const transporter = createMailTransporter();
+    await transporter.sendMail({
+      from: `"AITA" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
+      to: user.email,
+      subject: 'Verify your AITA email',
+      html: `
+        <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
+          <h2 style="color: #6EE7F7; margin-bottom: 16px;">Verify your email</h2>
+          <p style="color: #ccc; margin-bottom: 24px;">
+            Hi <strong>${user.displayName || user.username}</strong>,<br><br>
+            Click the button below to verify your AITA email address.
+            This link expires in <strong>24 hours</strong>.
+          </p>
+          <a href="${verifyUrl}" style="
+            display: inline-block;
+            background: #6EE7F7;
+            color: #0D0F1A;
+            padding: 12px 28px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 700;
+            margin-bottom: 24px;
+          ">Verify email</a>
+          <p style="color: #444; font-size: 0.8rem; margin-top: 24px;">— The AITA team 🐒</p>
+        </div>
+      `,
+    });
+
+    return res.status(200).json({ message: 'If that email exists, a verification link has been sent.' });
+  } catch (err) {
+    console.error('Error during resend verification:', err);
     return res.status(500).json({ message: 'Server error' });
   }
 };
