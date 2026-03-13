@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run:*)",
+      "Bash(netstat -ano)",
+      "Bash(node backend/server.js)",
+      "Bash(npm start:*)"
+    ]
+  }
+}

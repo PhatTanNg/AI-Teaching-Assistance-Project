@@ -7,6 +7,7 @@ import MonkeyChat from './components/MonkeyChat.jsx';
 import { Toaster } from './components/ui/sonner';
 import OnboardingModal, { useOnboarding } from './components/OnboardingModal.jsx';
 import ThemeTransition from './components/ThemeTransition.jsx';
+import FloatingBackground from './components/FloatingBackground.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import { useAuth } from './context/AuthContext.jsx';
 import Home from './pages/Home.jsx';
@@ -50,6 +51,7 @@ function AppLayout() {
 
   return (
     <div className="app-layout">
+      <FloatingBackground />
       {user && user.emailVerified === false && (
         <div className="email-verify-banner">
           <span>
@@ -117,6 +119,7 @@ function PublicLayout() {
 
   return (
     <div className="app-public">
+      <FloatingBackground />
       {!isAuthenticated && !bannerDismissed && (
         <div className="announcement-banner" role="banner">
           <span className="announcement-banner__text">
