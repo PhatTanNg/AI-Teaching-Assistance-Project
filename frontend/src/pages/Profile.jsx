@@ -13,6 +13,16 @@ const Profile = () => {
   const { theme, setTheme } = useTheme();
   const isDark = theme !== 'light';
 
+  const [showBg, setShowBg] = useState(
+    () => localStorage.getItem('aita-floating-bg') !== '0'
+  );
+
+  const toggleBg = (val) => {
+    localStorage.setItem('aita-floating-bg', val ? '1' : '0');
+    window.dispatchEvent(new Event('aita-prefs-change'));
+    setShowBg(val);
+  };
+
   const [isEditing, setIsEditing] = useState(false);
   const [displayName, setDisplayName] = useState('');
   const [dateOfBirth, setDateOfBirth] = useState('');
@@ -305,6 +315,20 @@ const Profile = () => {
                 </button>
               ))}
             </div>
+          </div>
+          {/* Background animation */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
+            <div>
+              <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{t('profile.showBackground')}</span>
+              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '2px 0 0' }}>{t('profile.showBackgroundDesc')}</p>
+            </div>
+            <button
+              type="button"
+              className={`btn btn--sm${showBg ? '' : ' btn--ghost'}`}
+              onClick={() => toggleBg(!showBg)}
+            >
+              {showBg ? t('profile.bgOn') : t('profile.bgOff')}
+            </button>
           </div>
         </div>
       </section>
