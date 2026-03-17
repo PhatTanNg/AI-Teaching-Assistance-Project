@@ -14,6 +14,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '../ui/dialog.tsx';
@@ -253,6 +254,7 @@ export default function MindMapLibrary({ maps, selectedId, onSelect, onCreateCli
         <DialogContent style={{ maxWidth: 420 }}>
           <DialogHeader>
             <DialogTitle>{t('mindmap.sourcesTitle')}</DialogTitle>
+            <DialogDescription className="sr-only">{t('mindmap.sourcesTitle')}</DialogDescription>
           </DialogHeader>
           {sourcesMap && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>

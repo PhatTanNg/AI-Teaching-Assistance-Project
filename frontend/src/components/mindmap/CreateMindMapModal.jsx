@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '../ui/dialog.tsx';
@@ -134,6 +135,7 @@ export default function CreateMindMapModal({ open, onClose, onCreated }) {
         <DialogContent style={{ maxWidth: 500 }}>
           <DialogHeader>
             <DialogTitle>{t('mindmap.modalTitle')}</DialogTitle>
+            <DialogDescription className="sr-only">{t('mindmap.modalTitle')}</DialogDescription>
           </DialogHeader>
 
           {/* Select all / deselect all */}

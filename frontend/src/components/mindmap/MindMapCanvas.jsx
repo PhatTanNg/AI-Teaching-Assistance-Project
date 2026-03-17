@@ -119,16 +119,31 @@ function InnerCanvas({ mapData, onNodeSelect, canvasRef }) {
       return;
     }
 
-    // Root node uses mapData.title
-    const root = { label: mapData.title, children: mapData.children };
-    const { nodes: rawNodes, edges: rawEdges } = treeToElements(root);
-    const laidOut = applyLayout(rawNodes, rawEdges);
+    try {
+      // Root node uses mapData.title
+      const root = { label: mapData.title, children: mapData.children };
+      const { nodes: rawNodes, edges: rawEdges } = treeToElements(root);
+      const laidOut = applyLayout(rawNodes, rawEdges);
 
-    setNodes(laidOut);
-    setEdges(rawEdges);
+      setNodes(laidOut);
+      setEdges(rawEdges);
 
-    // Fit after a short delay so React Flow has rendered
-    setTimeout(() => fitView({ padding: 0.15, duration: 400 }), 50);
+      // Fit after a short delay so React Flow has rendered
+      setTimeout(() => fitView({ padding: 0.15, duration: 400 }), 50);
+    } catch (err) {
+      console.error('[MindMapCanvas] Layout error:', err);
+      // Fallback: show nodes without layout (stacked)
+      try {
+        const root = { label: mapData.title, children: mapData.children };
+        const { nodes: rawNodes, edges: rawEdges } = treeToElements(root);
+        setNodes(rawNodes);
+        setEdges(rawEdges);
+        setTimeout(() => fitView({ padding: 0.15, duration: 400 }), 50);
+      } catch {
+        setNodes([]);
+        setEdges([]);
+      }
+    }
   }, [mapData, fitView, setNodes, setEdges]);
 
   // Handle node click: collapse/expand children OR notify parent for detail panel
