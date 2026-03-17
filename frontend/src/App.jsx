@@ -23,6 +23,7 @@ import Transcripts from './pages/Transcripts.jsx';
 import Keywords from './pages/Keywords.jsx';
 import RevisionModePage from './pages/RevisionModePage.jsx';
 import Profile from './pages/Profile.jsx';
+import MindMapPage from './pages/MindMapPage.jsx';
 
 /* Authenticated layout — sidebar + main content area */
 function AppLayout() {
@@ -208,6 +209,7 @@ export default function App() {
             <Route path="/transcripts" element={<Transcripts />} />
             <Route path="/keywords" element={<Keywords />} />
             <Route path="/revision" element={<RevisionModePage />} />
+            <Route path="/mindmap" element={<MindMapPage />} />
             <Route path="/profile" element={<Profile />} />
           </Route>
         </Route>

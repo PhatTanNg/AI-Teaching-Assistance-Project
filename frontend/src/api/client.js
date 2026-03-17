@@ -226,3 +226,26 @@ export const streamChat = (token, messages, context = {}) =>
     credentials: 'include',
   });
 
+// ==================== MINDMAP ENDPOINTS ====================
+
+export const getMindMaps = (token) =>
+  apiClient('/api/mindmaps', { token });
+
+export const getMindMap = (token, id) =>
+  apiClient(`/api/mindmaps/${id}`, { token });
+
+export const generateMindMap = (token, transcriptIds) =>
+  apiClient('/api/mindmaps/generate', { method: 'POST', token, data: { transcriptIds } });
+
+export const overwriteMindMap = (token, id, transcriptIds) =>
+  apiClient(`/api/mindmaps/${id}/overwrite`, { method: 'PUT', token, data: { transcriptIds } });
+
+export const renameMindMap = (token, id, title) =>
+  apiClient(`/api/mindmaps/${id}`, { method: 'PUT', token, data: { title } });
+
+export const deleteMindMap = (token, id) =>
+  apiClient(`/api/mindmaps/${id}`, { method: 'DELETE', token });
+
+export const regenerateMindMap = (token, id) =>
+  apiClient(`/api/mindmaps/${id}/regenerate`, { method: 'POST', token });
+

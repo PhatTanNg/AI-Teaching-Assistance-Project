@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom';
 import { useTheme } from 'next-themes';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useLanguage } from '../context/LanguageContext.jsx';
-import { Mic, FileText, BookMarked, Target, LogOut, Moon, Sun, ChevronLeft, ChevronRight, User } from 'lucide-react';
+import { Mic, FileText, BookMarked, Target, GitFork, LogOut, Moon, Sun, ChevronLeft, ChevronRight, User } from 'lucide-react';
 
 export default function Sidebar({ collapsed = false, onCollapse }) {
   const { user, logout } = useAuth();
@@ -15,6 +15,7 @@ export default function Sidebar({ collapsed = false, onCollapse }) {
     { icon: FileText,   label: t('nav.transcripts'), path: '/transcripts' },
     { icon: BookMarked, label: t('nav.keywords'),    path: '/keywords' },
     { icon: Target,     label: t('nav.revision'),    path: '/revision' },
+    { icon: GitFork,    label: t('nav.mindmap'),     path: '/mindmap' },
   ], [t]);
 
   const isDark = theme !== 'light';

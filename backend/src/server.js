@@ -10,6 +10,7 @@ import subjectRoute from "./routes/subjectRoute.js";
 import contentRoute from "./routes/contentRoute.js";
 import revisionRouter from "./revision/routes/revisionRouter.js";
 import chatRoute from "./routes/chatRoute.js";
+import mindmapRoute from "./routes/mindmapRoute.js";
 import { protectedRoute } from "./middlewares/authMiddleware.js";
 import http from 'http';
 import WebSocket, { WebSocketServer } from 'ws';
@@ -54,6 +55,7 @@ app.use("/api/subjects", subjectRoute);
 app.use("/api/content", contentRoute);
 app.use('/revision', revisionRouter);
 app.use('/api/chat', chatRoute);
+app.use('/api/mindmaps', protectedRoute, mindmapRoute);
 
 // Proxy endpoint for keyword analysis (forwards to Python backend)
 app.post('/api/analyze', async (req, res) => {
