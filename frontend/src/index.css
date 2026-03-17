@@ -2907,6 +2907,20 @@ html.light .transcript-card:hover {
   overflow: hidden !important;
 }
 
+/* Active tab content fills the dialog height.
+   Using data-state selector (not inline display) so Radix can still
+   apply display:none to inactive tabs without being overridden. */
+.transcript-dialog [data-state="active"][data-slot="tabs-content"] {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+.transcript-dialog [data-state="active"][data-slot="tabs-content"] > .transcript-dialog__text-box,
+.transcript-dialog [data-state="active"][data-slot="tabs-content"] > .transcript-dialog__summary-box {
+  flex: 1;
+  min-height: 0;
+}
+
 .transcript-dialog__text-box {
   padding: 1rem 1.1rem;
   background: var(--bg-elevated);

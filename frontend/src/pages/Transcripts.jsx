@@ -287,7 +287,7 @@ const Transcripts = () => {
                 </div>
 
                 {/* Transcript tab */}
-                <TabsContent value="transcript" style={{ marginTop: '0.75rem', flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+                <TabsContent value="transcript" style={{ marginTop: '0.75rem', minHeight: 0, overflowY: 'auto' }}>
                   {editingField === 'rawTranscript' ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', flex: 1, minHeight: 0 }}>
                       <textarea
@@ -313,7 +313,7 @@ const Transcripts = () => {
                 </TabsContent>
 
                 {/* Summary tab */}
-                <TabsContent value="summary" style={{ marginTop: '0.75rem', flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+                <TabsContent value="summary" style={{ marginTop: '0.75rem', minHeight: 0, overflowY: 'auto' }}>
                   {editingField === 'summary' ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', flex: 1, minHeight: 0 }}>
                       <textarea
