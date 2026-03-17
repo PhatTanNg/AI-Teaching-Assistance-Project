@@ -2,6 +2,63 @@ import { SpeechClient } from '@google-cloud/speech';
 import FormData from 'form-data';
 import axios from 'axios';
 
+// ── Real-time keyword extraction ──────────────────────────────────────────────
+const KEYWORD_PROMPTS = {
+  vi: 'Bạn là trợ lý học tập. Từ đoạn ghi âm bài giảng, hãy trích xuất 3–8 thuật ngữ kỹ thuật hoặc học thuật quan trọng mà sinh viên cần nắm. Bỏ qua các từ thông thường, tên người, lời chào hỏi. Trả về ĐÚNG JSON: [{"word":"...","definition":"..."}]. Định nghĩa bằng tiếng Việt, ngắn gọn 1–2 câu.',
+  en: 'You are a study assistant. Extract 3–8 technical or academic keywords from this lecture transcript that a student should know. Ignore common words, names, and greetings. Return ONLY valid JSON: [{"word":"...","definition":"..."}]. Definitions in English, concise 1–2 sentences.',
+};
+
+export const analyzeKeywordsHandler = async (req, res) => {
+  try {
+    const { transcript, language = 'vi' } = req.body;
+    if (!transcript?.trim()) return res.status(400).json({ error: 'No transcript provided' });
+
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) return res.status(500).json({ error: 'OpenAI API key not configured' });
+
+    const systemPrompt = KEYWORD_PROMPTS[language] || KEYWORD_PROMPTS.en;
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+        temperature: 0.2,
+        max_tokens: 500,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: `Transcript:\n${transcript.substring(0, 3000)}` },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      return res.status(502).json({ error: 'Keyword analysis failed', details: errText });
+    }
+
+    const data = await response.json();
+    const raw = data.choices?.[0]?.message?.content?.trim() || '';
+    const first = raw.indexOf('['), last = raw.lastIndexOf(']');
+    let keywords = [];
+    if (first !== -1 && last !== -1) {
+      try {
+        const parsed = JSON.parse(raw.slice(first, last + 1));
+        if (Array.isArray(parsed)) {
+          keywords = parsed
+            .filter(k => k?.word)
+            .map(k => ({ word: k.word.trim(), definition: k.definition?.trim() || '' }));
+        }
+      } catch { /* return empty on parse error */ }
+    }
+
+    return res.json({ keywords });
+  } catch (err) {
+    console.error('Keyword analysis error:', err.message);
+    return res.status(500).json({ error: 'Analysis failed', details: err.message });
+  }
+};
+
 const ALLOWED_TYPES = [
   'audio/wav', 'audio/x-wav', 'audio/flac', 'audio/mp3', 'audio/mpeg',
   'audio/mp4', 'audio/m4a', 'audio/x-m4a', 'audio/amr', 'audio/ogg',

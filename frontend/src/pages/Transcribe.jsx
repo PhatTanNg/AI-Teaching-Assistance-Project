@@ -6,7 +6,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Alert, AlertDescription } from '../components/ui/alert';
 import { toast } from 'sonner';
-import { createTranscript, createKeywords, transcribeFile, correctTranscript } from '../api/client';
+import { createTranscript, createKeywords, transcribeFile, correctTranscript, apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 
@@ -109,8 +109,6 @@ const Transcribe = () => {
   const [saveError, setSaveError]                   = useState('');
   const [isSummarizing]                             = useState(false);
   const [transcriptionStopped, setTranscriptionStopped] = useState(false);
-
-  const ANALYSIS_API = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001').replace(/\/$/, '') + '/api/analyze';
 
   /* ── Speech recognition setup (re-runs only when language changes) ── */
   useEffect(() => {
@@ -219,13 +217,11 @@ const Transcribe = () => {
     setIsAnalyzing(true);
     const cleaned = text.replace(/\|/g, '').trim();
     try {
-      const res = await fetch(ANALYSIS_API, {
+      const data = await apiClient('/api/transcribe/analyze', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transcript: cleaned }),
+        data: { transcript: cleaned, language: transcribeLang },
+        token,
       });
-      if (!res.ok) throw new Error(`Analysis failed (${res.status})`);
-      const data = await res.json();
       if (data.keywords?.length) {
         setKeywords(prev => {
           const updated = [...prev];
@@ -248,7 +244,7 @@ const Transcribe = () => {
     } finally {
       setIsAnalyzing(false);
     }
-  }, [ANALYSIS_API]);
+  }, [transcribeLang, token]);
 
   useEffect(() => {
     if (!isRecording && !demoMode) return;
