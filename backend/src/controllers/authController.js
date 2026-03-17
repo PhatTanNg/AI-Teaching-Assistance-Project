@@ -263,6 +263,40 @@ export const verifyEmail = async (req, res) => {
   }
 };
 
+export const refresh = async (req, res) => {
+  try {
+    const refreshToken = req.cookies?.refreshToken;
+    if (!refreshToken) {
+      return res.status(401).json({ message: 'No refresh token' });
+    }
+
+    const session = await Session.findOne({ refreshToken });
+    if (!session) {
+      return res.status(401).json({ message: 'Session not found' });
+    }
+    if (session.expiresAt < new Date()) {
+      await Session.deleteOne({ _id: session._id });
+      return res.status(401).json({ message: 'Session expired' });
+    }
+
+    const user = await User.findById(session.userId).select('_id username');
+    if (!user) {
+      return res.status(401).json({ message: 'User not found' });
+    }
+
+    const accessToken = jwt.sign(
+      { userId: user._id, username: user.username },
+      process.env.ACCESS_TOKEN_SECRET,
+      { expiresIn: ACCESS_TOKEN_TTL },
+    );
+
+    return res.status(200).json({ accessToken });
+  } catch (err) {
+    console.error('Error during token refresh:', err);
+    return res.status(500).json({ message: 'Server error' });
+  }
+};
+
 export const resendVerification = async (req, res) => {
   try {
     const { email } = req.body;

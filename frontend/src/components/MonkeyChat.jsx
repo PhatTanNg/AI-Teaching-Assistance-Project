@@ -250,8 +250,8 @@ export default function MonkeyChat() {
         aria-label={isOpen ? 'Close chat' : 'Open Kiki AI chat'}
         style={{
           position: 'fixed',
-          bottom: 'calc(var(--bottom-nav-height, 0px) + 20px)',
-          right: '20px',
+          bottom: 'calc(var(--bottom-nav-height, 0px) + 16px)',
+          right: '16px',
           zIndex: 200,
           width: '52px',
           height: '52px',
@@ -281,10 +281,13 @@ export default function MonkeyChat() {
           aria-label="Kiki AI chat"
           style={{
             position: 'fixed',
-            bottom: 'calc(var(--bottom-nav-height, 0px) + 84px)',
-            right: '16px',
-            width: 'min(360px, calc(100vw - 32px))',
-            height: 'min(480px, calc(100vh - 140px))',
+            bottom: 'calc(var(--bottom-nav-height, 0px) + 80px)',
+            right: '8px',
+            left: 'auto',
+            width: 'min(360px, calc(100vw - 16px))',
+            /* On mobile, cap height so the panel top stays ≥64px from screen top */
+            height: 'min(520px, calc(100dvh - var(--bottom-nav-height, 0px) - 140px))',
+            minHeight: '280px',
             zIndex: 199,
             borderRadius: '1rem',
             background: 'var(--card-bg)',

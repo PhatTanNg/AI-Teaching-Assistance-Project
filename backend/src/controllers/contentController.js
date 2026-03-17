@@ -21,7 +21,7 @@ import { generateSummary } from '../services/summaryService.js';
  */
 export const createTranscript = async (req, res) => {
   try {
-    const { subject, rawTranscript } = req.body;
+    const { subject, rawTranscript, lang } = req.body;
     const userId = req.userId;
 
     if (!userId) {
@@ -71,6 +71,7 @@ export const createTranscript = async (req, res) => {
         const summaryText = await generateSummary(rawTranscript.trim(), {
           subject: subject.trim(),
           date: new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+          targetLanguage: lang || '',
         }).catch((e) => {
           console.warn('[SUMMARY] generation failed:', e?.message || e);
           return '';

@@ -56,7 +56,7 @@ const LANG_LABELS  = { vi: '🇻🇳 Tiếng Việt', en: '🇬🇧 English' };
 const Transcribe = () => {
   const navigate = useNavigate();
   const { token } = useAuth();
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
 
   // Input mode + language
   const [inputMode, setInputMode]       = useState('live'); // 'live' | 'upload'
@@ -397,7 +397,7 @@ const Transcribe = () => {
     if (!token) { setSaveError('Not authenticated. Please log in again.'); setTimeout(() => navigate('/signin'), 2000); return; }
     try {
       setIsSaving(true);
-      const transcriptData = await createTranscript(token, { subject: subject.trim(), rawTranscript: editedTranscript.trim() });
+      const transcriptData = await createTranscript(token, { subject: subject.trim(), rawTranscript: editedTranscript.trim(), lang });
 
       if (keywords?.length) {
         try {
@@ -520,7 +520,7 @@ const Transcribe = () => {
           </div>
 
           {/* Divider */}
-          <div style={{ width: '1px', height: '24px', background: 'var(--card-border)' }} />
+          <div className="settings-divider" />
 
           {/* Input mode */}
           <div style={{ display: 'flex', gap: '0.25rem' }}>
@@ -539,7 +539,7 @@ const Transcribe = () => {
           {/* AutoCorrect toggle (live mode only) */}
           {inputMode === 'live' && (
             <>
-              <div style={{ width: '1px', height: '24px', background: 'var(--card-border)' }} />
+              <div className="settings-divider" />
               <button type="button"
                 className={`btn btn--sm${autoCorrect ? '' : ' btn--ghost'}`}
                 onClick={() => setAutoCorrect(v => !v)} title="Toggle real-time AI correction">

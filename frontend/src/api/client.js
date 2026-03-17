@@ -1,11 +1,30 @@
 const defaultBaseUrl = 'http://localhost:5001';
 const baseUrl = import.meta.env.VITE_API_BASE_URL ?? defaultBaseUrl;
+const AUTH_TOKEN_KEY = 'aita_access_token';
 
-export const apiClient = async (endpoint, { method = 'GET', data, token } = {}) => {
+// Deduplicate concurrent refresh calls — only one in-flight at a time
+let refreshPromise = null;
+
+const silentRefresh = async () => {
+  if (refreshPromise) return refreshPromise;
+  refreshPromise = fetch(`${baseUrl}/api/auth/refresh`, {
+    method: 'POST',
+    credentials: 'include',
+  })
+    .then(async (res) => {
+      if (!res.ok) throw new Error('Refresh failed');
+      const { accessToken } = await res.json();
+      try { localStorage.setItem(AUTH_TOKEN_KEY, accessToken); } catch (e) { /* ignore */ }
+      return accessToken;
+    })
+    .finally(() => { refreshPromise = null; });
+  return refreshPromise;
+};
+
+export const apiClient = async (endpoint, { method = 'GET', data, token, _retry = false } = {}) => {
   const headers = new Headers({ 'Content-Type': 'application/json' });
 
   // fallback to stored token if not provided
-  const AUTH_TOKEN_KEY = 'aita_access_token';
   const effectiveToken = token || (typeof window !== 'undefined' ? localStorage.getItem(AUTH_TOKEN_KEY) : null);
   if (effectiveToken) {
     headers.append('Authorization', `Bearer ${String(effectiveToken).trim()}`);
@@ -21,14 +40,16 @@ export const apiClient = async (endpoint, { method = 'GET', data, token } = {}) 
   const payload = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    // Clear invalid auth tokens on 401 (expired/invalid) — NOT 403 (permission denied)
-    if (response.status === 401) {
+    // On 401: attempt a silent token refresh once, then retry the original request
+    if (response.status === 401 && !_retry) {
       try {
-        localStorage.removeItem(AUTH_TOKEN_KEY);
-      } catch (e) {
-        // ignore
+        const newToken = await silentRefresh();
+        return apiClient(endpoint, { method, data, token: newToken, _retry: true });
+      } catch (_refreshErr) {
+        // Refresh failed — clear stored token and surface the 401
+        try { localStorage.removeItem(AUTH_TOKEN_KEY); } catch (e) { /* ignore */ }
+        console.warn('[API] Session expired — please sign in again');
       }
-      console.warn('[API] Token invalid/expired (401), cleared stored token');
     }
 
     const error = new Error(payload.message ?? 'Request failed');
@@ -89,11 +110,11 @@ export const deleteLecture = (token, lectureId) =>
 
 // ==================== TRANSCRIPT ENDPOINTS ====================
 
-export const createTranscript = (token, { subject, rawTranscript }) =>
+export const createTranscript = (token, { subject, rawTranscript, lang }) =>
   apiClient('/api/content/transcripts', {
     method: 'POST',
     token,
-    data: { subject, rawTranscript },
+    data: { subject, rawTranscript, lang },
   });
 
 export const getTranscripts = (token) =>

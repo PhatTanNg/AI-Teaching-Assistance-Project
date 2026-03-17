@@ -13,7 +13,7 @@
  * @returns {Promise<string>} - The generated notes in Markdown
  * @throws {Error} - If generation fails or API key is missing
  */
-export const generateSummary = async (transcript, { subject = '', date = '' } = {}) => {
+export const generateSummary = async (transcript, { subject = '', date = '', targetLanguage = '' } = {}) => {
   // Load API key from environment variable
   const apiKey = process.env.OPENAI_API_KEY;
 
@@ -27,6 +27,11 @@ export const generateSummary = async (transcript, { subject = '', date = '' } = 
 
   const today = date || new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
   const subjectHint = subject ? `The lecture subject is: "${subject}".` : '';
+  const langMap = { vi: 'Vietnamese', en: 'English', ga: 'Irish (Gaeilge)' };
+  const outputLang = langMap[targetLanguage] || null;
+  const langInstruction = outputLang
+    ? `Write ALL notes in ${outputLang}. All section headings must be in ${outputLang}.`
+    : 'Detect the language of the transcript and write ALL notes in that language (Vietnamese or English). Section headings must also be in the detected language.';
 
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -42,7 +47,7 @@ export const generateSummary = async (transcript, { subject = '', date = '' } = 
             role: 'system',
             content: `You are an expert academic note-taking assistant for university students. Generate structured study notes from lecture transcripts in Markdown format.
 
-Detect the language of the transcript and write ALL notes in that language (Vietnamese or English). Section headings must also be in the detected language.
+${langInstruction}
 
 Output structure:
 # [Topic title inferred from transcript]
@@ -63,10 +68,15 @@ $$[LaTeX]$$
 - [bullet takeaway]
 (3–5 items)
 
+## [Câu hỏi ôn tập / Review Questions]
+1. [question to test understanding]
+(3–5 numbered questions, no answers)
+
 RULES:
-- Write everything in the detected language of the transcript
+- ${langInstruction}
 - Use LaTeX notation for math: $inline$ or $$block$$
 - Omit the Formulas section if there is no mathematical content
+- Always include the Review Questions section
 - Do NOT include any text outside the markdown notes`,
           },
           {

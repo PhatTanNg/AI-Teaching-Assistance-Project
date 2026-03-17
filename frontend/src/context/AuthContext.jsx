@@ -4,11 +4,10 @@ import { apiClient } from '../api/client.js';
 const AuthContext = createContext(null);
 
 const AUTH_TOKEN_KEY = 'aita_access_token';
+const baseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5001';
 
 const readStoredToken = () => {
-  if (typeof window === 'undefined') {
-    return null;
-  }
+  if (typeof window === 'undefined') return null;
   try {
     return localStorage.getItem(AUTH_TOKEN_KEY);
   } catch (error) {
@@ -18,10 +17,36 @@ const readStoredToken = () => {
 };
 
 export const AuthProvider = ({ children }) => {
-  const [token, setToken] = useState(readStoredToken);
+  const [token, setToken] = useState(null);
   const [user, setUser] = useState(null);
-  const [isLoading, setIsLoading] = useState(!!token);
+  const [isLoading, setIsLoading] = useState(true);
   const isAuthenticated = Boolean(token);
+
+  // On mount: use stored token or silently refresh via cookie
+  useEffect(() => {
+    const init = async () => {
+      const stored = readStoredToken();
+      if (stored) {
+        setToken(stored);
+        return; // fetchProfile will run via the token effect below
+      }
+      // No stored token — try to get one from the refresh cookie (returning user)
+      try {
+        const res = await fetch(`${baseUrl}/api/auth/refresh`, {
+          method: 'POST',
+          credentials: 'include',
+        });
+        if (res.ok) {
+          const { accessToken } = await res.json();
+          try { localStorage.setItem(AUTH_TOKEN_KEY, accessToken); } catch (e) { /* ignore */ }
+          setToken(accessToken);
+          return;
+        }
+      } catch (_) { /* no cookie or network error — user needs to sign in */ }
+      setIsLoading(false);
+    };
+    init();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchProfile = useCallback(async () => {
     if (!token) {

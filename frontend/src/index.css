@@ -1551,6 +1551,17 @@ html.light .transcript-card:hover {
   }
 }
 
+/* Vertical divider inside settings bars — hidden when wrapping on small screens */
+.settings-divider {
+  width: 1px;
+  height: 24px;
+  background: var(--card-border);
+  flex-shrink: 0;
+}
+@media (max-width: 640px) {
+  .settings-divider { display: none; }
+}
+
 .transcript-display {
   min-height: 350px;
   padding: 1.25rem;
@@ -2975,7 +2986,11 @@ html.light .transcript-card:hover {
     transform: none !important;
     left: 0 !important;
     top: 0 !important;
-    padding: 1.1rem 1rem 1.5rem !important;
+    /* Respect iPhone notch / Dynamic Island / home indicator */
+    padding: max(1.1rem, env(safe-area-inset-top, 1.1rem))
+             max(1rem, env(safe-area-inset-right, 1rem))
+             max(1.5rem, env(safe-area-inset-bottom, 1.5rem))
+             max(1rem, env(safe-area-inset-left, 1rem)) !important;
     overflow-y: auto !important;
   }
 }
@@ -3104,7 +3119,9 @@ html.light .transcript-card:hover {
 @media (max-width: 640px) {
   .mascot {
     bottom: calc(var(--bottom-nav-height) + 12px);
-    right: 16px;
+    /* Move to left side so it doesn't conflict with the FAB (right: 16px) */
+    left: 16px !important;
+    right: auto !important;
     width: 56px;
     height: 56px;
   }
@@ -3242,7 +3259,9 @@ html.light .transcript-card:hover {
    RESPONSIVE — MOBILE (≤ 640px)
    ============================================== */
 @media (max-width: 640px) {
-  :root { --bottom-nav-height: 72px; }
+  :root {
+    --bottom-nav-height: calc(68px + env(safe-area-inset-bottom, 0px));
+  }
   .sidebar { display: none; }
   .sidebar__collapse-btn { display: none; }
   .app-main { margin-left: 0 !important; }
@@ -3251,7 +3270,7 @@ html.light .transcript-card:hover {
   .bottom-nav {
     display: flex;
     position: fixed;
-    bottom: 16px;
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
     left: 50%;
     transform: translateX(-50%);
     width: max-content;
@@ -3277,7 +3296,7 @@ html.light .transcript-card:hover {
     color: var(--text-muted);
     text-decoration: none;
     width: 44px;
-    height: 40px;
+    height: 44px;
     border-radius: 999px;
     transition: color var(--transition-fast), background var(--transition-fast);
     flex-shrink: 0;
@@ -3300,11 +3319,14 @@ html.light .transcript-card:hover {
   .app-main {
     margin-left: 0;
     padding: 1rem;
-    padding-bottom: calc(var(--bottom-nav-height) + 1rem);
+    padding-left: max(1rem, env(safe-area-inset-left, 1rem));
+    padding-right: max(1rem, env(safe-area-inset-right, 1rem));
+    /* Extra 60px so content clears the FAB (52px) above the nav */
+    padding-bottom: calc(var(--bottom-nav-height) + 72px);
   }
 
   h1 { font-size: 1.5rem; }
-  body { font-size: 0.875rem; }
+  body { font-size: 0.9rem; }
 
   .card { padding: 1rem; border-radius: 0.75rem; }
 
@@ -3328,6 +3350,43 @@ html.light .transcript-card:hover {
   .transcripts-grid { grid-template-columns: 1fr; }
 
   .auth-card { padding: 1.5rem 1.25rem; }
+
+  /* Revision: hide difficulty + count labels on very narrow screens to save space */
+  .revision-settings label { font-size: 0.8rem; }
+
+  /* Tabs: allow wrapping on very small screens */
+  [data-slot="tabs-list"] { flex-wrap: wrap; }
+  [data-slot="tabs-trigger"] { font-size: 0.78rem; padding: 0.4rem 0.5rem; }
+}
+
+/* ==============================================
+   RESPONSIVE — TABLET (641px – 768px)
+   ============================================== */
+@media (min-width: 641px) and (max-width: 768px) {
+  /* Transcript cards: allow slightly narrower min so 2 cols fit comfortably */
+  .transcripts-grid {
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  }
+
+  /* Revision layout: stack on tablet too for better readability */
+  .revision-layout {
+    grid-template-columns: 1fr;
+  }
+
+  /* Progress stats: keep 2 cols on tablet */
+  .progress-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* Home quick-access: 2 cols */
+  .home__quick-card {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* App main: no sidebar, full width */
+  .app-main { margin-left: 0 !important; }
+  .sidebar { display: none; }
+  .sidebar__collapse-btn { display: none; }
 }
 
 /* ===================================================================

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileText, Trash2, Calendar, Eye, Edit2, Save, X, BookOpen, AlignLeft, Sparkles } from 'lucide-react';
+import { FileText, Trash2, Calendar, Eye, Edit2, Save, X, BookOpen, AlignLeft, Sparkles, BarChart2, Download } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
@@ -26,6 +26,8 @@ import {
   updateTranscriptText,
 } from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import TranscriptVisualizer from '../components/TranscriptVisualizer';
+import { printNote } from '../utils/printNote';
 import { useLanguage } from '../context/LanguageContext';
 import { useChatContext } from '../context/ChatContext';
 
@@ -193,26 +195,38 @@ const Transcripts = () => {
           {selectedTranscript ? (
             <>
               <DialogHeader style={{ paddingBottom: '0.75rem', borderBottom: '1px solid var(--glass-border)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                  <div style={{
-                    width: 40, height: 40, borderRadius: '0.75rem', flexShrink: 0,
-                    background: 'rgba(245,166,35,0.1)', border: '1px solid rgba(245,166,35,0.2)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: 'var(--accent-primary)'
-                  }}>
-                    <BookOpen size={20} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 0 }}>
+                    <div style={{
+                      width: 40, height: 40, borderRadius: '0.75rem', flexShrink: 0,
+                      background: 'rgba(245,166,35,0.1)', border: '1px solid rgba(245,166,35,0.2)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      color: 'var(--accent-primary)'
+                    }}>
+                      <BookOpen size={20} />
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <DialogTitle style={{ color: 'var(--text-primary)', fontSize: '1.05rem', lineHeight: 1.3 }}>
+                        {selectedTranscript.subject || 'Transcript'}
+                      </DialogTitle>
+                      <DialogDescription style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginTop: '0.1rem', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <Calendar size={11} />
+                        {selectedTranscript.transcribedAt
+                          ? new Date(selectedTranscript.transcribedAt).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                          : ''}
+                      </DialogDescription>
+                    </div>
                   </div>
-                  <div style={{ minWidth: 0 }}>
-                    <DialogTitle style={{ color: 'var(--text-primary)', fontSize: '1.05rem', lineHeight: 1.3 }}>
-                      {selectedTranscript.subject || 'Transcript'}
-                    </DialogTitle>
-                    <DialogDescription style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginTop: '0.1rem', display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <Calendar size={11} />
-                      {selectedTranscript.transcribedAt
-                        ? new Date(selectedTranscript.transcribedAt).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
-                        : ''}
-                    </DialogDescription>
-                  </div>
+                  <Button
+                    size="sm"
+                    className="btn btn--ghost btn--sm"
+                    style={{ flexShrink: 0 }}
+                    onClick={() => printNote(selectedTranscript)}
+                    title={t('transcripts.downloadPdf')}
+                  >
+                    <Download size={14} />
+                    <span className="desktop-only" style={{ marginLeft: '0.3rem' }}>{t('transcripts.downloadPdf')}</span>
+                  </Button>
                 </div>
               </DialogHeader>
 
@@ -230,7 +244,7 @@ const Transcripts = () => {
                     padding: '0.25rem',
                     flex: 1,
                     display: 'grid',
-                    gridTemplateColumns: '1fr 1fr',
+                    gridTemplateColumns: '1fr 1fr 1fr',
                     gap: '0.25rem',
                   }}>
                     <TabsTrigger value="transcript">
@@ -246,6 +260,10 @@ const Transcripts = () => {
                           marginLeft: '0.25rem',
                         }}>...</span>
                       )}
+                    </TabsTrigger>
+                    <TabsTrigger value="visualize">
+                      <BarChart2 size={13} />
+                      {t('transcripts.visualizeLabel')}
                     </TabsTrigger>
                   </TabsList>
                   {activeTab === 'transcript' && editingField !== 'rawTranscript' && (
@@ -269,16 +287,16 @@ const Transcripts = () => {
                 </div>
 
                 {/* Transcript tab */}
-                <TabsContent value="transcript" style={{ marginTop: '0.75rem', flex: 1, minHeight: 0, overflowY: 'auto' }}>
+                <TabsContent value="transcript" style={{ marginTop: '0.75rem', flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
                   {editingField === 'rawTranscript' ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', flex: 1, minHeight: 0 }}>
                       <textarea
                         className="neon-textarea"
                         value={editingText}
                         onChange={(e) => setEditingText(e.target.value)}
-                        style={{ minHeight: '200px', fontFamily: 'var(--font-mono)', fontSize: '0.85rem' }}
+                        style={{ flex: 1, minHeight: '300px', fontFamily: 'var(--font-mono)', fontSize: '0.85rem', resize: 'vertical' }}
                       />
-                      <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                      <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', flexShrink: 0 }}>
                         <Button onClick={handleSaveEdit} disabled={isSaving} className="btn btn--sm">
                           <Save size={14} /> {isSaving ? t('common.loading') : t('transcripts.saveEdit')}
                         </Button>
@@ -295,16 +313,16 @@ const Transcripts = () => {
                 </TabsContent>
 
                 {/* Summary tab */}
-                <TabsContent value="summary" style={{ marginTop: '0.75rem', flex: 1, minHeight: 0, overflowY: 'auto' }}>
+                <TabsContent value="summary" style={{ marginTop: '0.75rem', flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
                   {editingField === 'summary' ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', flex: 1, minHeight: 0 }}>
                       <textarea
                         className="neon-textarea"
                         value={editingText}
                         onChange={(e) => setEditingText(e.target.value)}
-                        style={{ minHeight: '180px' }}
+                        style={{ flex: 1, minHeight: '300px', resize: 'vertical' }}
                       />
-                      <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                      <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', flexShrink: 0 }}>
                         <Button onClick={handleSaveEdit} disabled={isSaving} className="btn btn--sm">
                           <Save size={14} /> {isSaving ? t('common.loading') : t('transcripts.saveEdit')}
                         </Button>
@@ -330,6 +348,14 @@ const Transcripts = () => {
                       </p>
                     </div>
                   )}
+                </TabsContent>
+                {/* Visualize tab */}
+                <TabsContent value="visualize" style={{ marginTop: '0.75rem', flex: 1, minHeight: 0, overflowY: 'auto' }}>
+                  <TranscriptVisualizer
+                    summary={selectedTranscript.summary}
+                    rawTranscript={selectedTranscript.rawTranscript}
+                    transcriptId={selectedTranscript._id}
+                  />
                 </TabsContent>
               </Tabs>
             </>
