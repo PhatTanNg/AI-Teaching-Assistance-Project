@@ -177,7 +177,7 @@ const Profile = () => {
   return (
     <div className="page">
       {/* ── Account Info ── */}
-      <section className="card card--wide card--accent-left" style={{ marginBottom: '1.5rem' }}>
+      <section className="card card--wide" style={{ marginBottom: '1.5rem' }}>
         <div className="card__header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
             {/* Avatar */}
@@ -290,7 +290,7 @@ const Profile = () => {
       </section>
 
       {/* ── Preferences ── */}
-      <section className="card card--wide card--accent-left" style={{ marginBottom: '1.5rem' }}>
+      <section className="card card--wide" style={{ marginBottom: '1.5rem' }}>
         <h3 className="card__title" style={{ fontSize: '1rem', marginBottom: '1rem' }}>
           {t('profile.preferences')}
         </h3>
@@ -358,7 +358,7 @@ const Profile = () => {
       </section>
 
       {/* ── Change Password ── */}
-      <section className="card card--wide card--accent-left" style={{ marginBottom: '1.5rem' }}>
+      <section className="card card--wide" style={{ marginBottom: '1.5rem' }}>
         <div className="card__header">
           <h3 className="card__title" style={{ fontSize: '1rem' }}>{t('profile.changePassword')}</h3>
           {!showPasswordForm && (
@@ -408,7 +408,7 @@ const Profile = () => {
       </section>
 
       {/* ── Session / Logout ── */}
-      <section className="card card--wide card--accent-left" style={{ marginBottom: '1.5rem' }}>
+      <section className="card card--wide" style={{ marginBottom: '1.5rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
           <div>
             <h3 className="card__title" style={{ fontSize: '1rem', marginBottom: '0.25rem' }}>{t('profile.logoutSection')}</h3>

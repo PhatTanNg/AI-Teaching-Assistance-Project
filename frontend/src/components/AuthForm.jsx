@@ -22,6 +22,7 @@ const AuthForm = ({ mode = 'signin', onSubmit, isSubmitting, error }) => {
   };
 
   return (
+    <div className="auth-card-wrapper">
     <form className="auth-card" onSubmit={handleSubmit}>
       <div className="auth-brand-mark">
         <div className="auth-brand-mark__icon">
@@ -99,6 +100,7 @@ const AuthForm = ({ mode = 'signin', onSubmit, isSubmitting, error }) => {
         {isSubmitting ? 'Processing…' : isSignUp ? 'Sign up' : 'Sign in'}
       </button>
     </form>
+    </div>
   );
 };
 
