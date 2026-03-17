@@ -6,15 +6,17 @@
  */
 
 /**
- * Generates a summary for a transcript using OpenAI's GPT API
- * @param {string} transcript - The transcript text to summarize
- * @returns {Promise<string>} - The generated summary text
- * @throws {Error} - If summarization fails or API key is missing
+ * Generates structured study notes for a transcript using OpenAI's GPT API.
+ * Output is Markdown with LaTeX math notation where applicable.
+ * @param {string} transcript - The transcript text
+ * @param {{ subject?: string, date?: string }} options - Optional subject and date
+ * @returns {Promise<string>} - The generated notes in Markdown
+ * @throws {Error} - If generation fails or API key is missing
  */
-export const generateSummary = async (transcript) => {
+export const generateSummary = async (transcript, { subject = '', date = '' } = {}) => {
   // Load API key from environment variable
   const apiKey = process.env.OPENAI_API_KEY;
-  
+
   if (!apiKey) {
     throw new Error('OPENAI_API_KEY environment variable is not set');
   }
@@ -22,6 +24,9 @@ export const generateSummary = async (transcript) => {
   if (!transcript || transcript.trim().length === 0) {
     throw new Error('Transcript cannot be empty');
   }
+
+  const today = date || new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const subjectHint = subject ? `The lecture subject is: "${subject}".` : '';
 
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -35,15 +40,42 @@ export const generateSummary = async (transcript) => {
         messages: [
           {
             role: 'system',
-            content: 'You are a helpful assistant that creates concise, clear summaries of educational lecture transcripts. Provide a summary that captures the main points and key concepts.',
+            content: `You are an expert academic note-taking assistant for university students. Generate structured study notes from lecture transcripts in Markdown format.
+
+Detect the language of the transcript and write ALL notes in that language (Vietnamese or English). Section headings must also be in the detected language.
+
+Output structure:
+# [Topic title inferred from transcript]
+**Ngày / Date:** ${today}${subject ? `\n**Môn học / Subject:** ${subject}` : ''}
+
+## [Giới thiệu / Introduction]
+[1–2 sentences]
+
+## [Khái niệm chính / Key Concepts]
+- **[term]**: [definition]
+(3–8 items)
+
+## [Công thức / Formulas] ← INCLUDE ONLY if math/formulas are present
+$$[LaTeX]$$
+*[Explanation]*
+
+## [Tóm tắt / Summary]
+- [bullet takeaway]
+(3–5 items)
+
+RULES:
+- Write everything in the detected language of the transcript
+- Use LaTeX notation for math: $inline$ or $$block$$
+- Omit the Formulas section if there is no mathematical content
+- Do NOT include any text outside the markdown notes`,
           },
           {
             role: 'user',
-            content: `Please summarize the following lecture transcript:\n\n${transcript}`,
+            content: `${subjectHint}\n\nTranscript:\n\n${transcript}`,
           },
         ],
-        temperature: 0.7,
-        max_tokens: 500,
+        temperature: 0.4,
+        max_tokens: 1200,
       }),
     });
 

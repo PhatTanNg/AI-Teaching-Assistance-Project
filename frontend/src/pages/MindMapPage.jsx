@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
+import { Plus } from 'lucide-react';
 import { getMindMaps, getMindMap } from '../api/client.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useLanguage } from '../context/LanguageContext.jsx';
@@ -104,6 +105,32 @@ export default function MindMapPage() {
 
       {/* ── Right panel: canvas ── */}
       <div className="mindmap-canvas-area">
+        {/* Mobile-only top bar — replaces hidden library */}
+        <div className="mindmap-mobile-bar">
+          <select
+            className="mindmap-mobile-bar__select"
+            value={selectedMeta?._id ?? ''}
+            onChange={(e) => {
+              const found = maps.find((m) => m._id === e.target.value);
+              if (found) handleSelect(found);
+            }}
+            aria-label={t('mindmap.selectMap')}
+          >
+            <option value="" disabled>{maps.length === 0 ? t('mindmap.emptyDesc') : t('mindmap.noMapSelected')}</option>
+            {maps.map((m) => (
+              <option key={m._id} value={m._id}>{m.title}</option>
+            ))}
+          </select>
+          <button
+            type="button"
+            className="btn btn--sm"
+            onClick={() => setIsCreateOpen(true)}
+            aria-label={t('mindmap.createBtn')}
+            style={{ flexShrink: 0, padding: '0.4rem 0.6rem', minHeight: '36px' }}
+          >
+            <Plus size={16} />
+          </button>
+        </div>
         {isGenerating ? (
           <div className="mindmap-gen-loader">
             <div className="mindmap-gen-loader__spinner" />

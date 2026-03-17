@@ -1,6 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FileText, Trash2, Calendar, Eye, Edit2, Save, X, BookOpen, AlignLeft, Sparkles } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
 import { Button } from '../components/ui/button';
 import { Alert, AlertDescription } from '../components/ui/alert';
 import {
@@ -40,6 +44,7 @@ const Transcripts = () => {
   const [editingField, setEditingField] = useState(null);
   const [editingText, setEditingText] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState('transcript');
 
   useEffect(() => {
     const loadData = async () => {
@@ -211,45 +216,69 @@ const Transcripts = () => {
                 </div>
               </DialogHeader>
 
-              <Tabs defaultValue="transcript" style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-                <TabsList style={{
-                  background: 'var(--bg-elevated)',
-                  border: '1px solid var(--card-border)',
-                  borderRadius: '0.75rem',
-                  padding: '0.25rem',
-                  width: '100%',
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 1fr',
-                  flexShrink: 0,
-                  gap: '0.25rem',
-                }}>
-                  <TabsTrigger value="transcript">
-                    <AlignLeft size={13} /> {t('transcripts.transcriptLabel')}
-                  </TabsTrigger>
-                  <TabsTrigger value="summary">
-                    <Sparkles size={13} />
-                    {t('transcripts.summaryLabel')}
-                    {!selectedTranscript.summary && (
-                      <span style={{
-                        fontSize: '0.65rem', background: 'rgba(252,211,77,0.2)',
-                        color: 'var(--accent-yellow)', padding: '1px 5px', borderRadius: '999px',
-                        marginLeft: '0.25rem',
-                      }}>...</span>
-                    )}
-                  </TabsTrigger>
-                </TabsList>
+              <Tabs
+                value={activeTab}
+                onValueChange={(v) => { setActiveTab(v); cancelEdit(); }}
+                style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}
+              >
+                {/* Tab row + contextual edit button */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
+                  <TabsList style={{
+                    background: 'var(--bg-elevated)',
+                    border: '1px solid var(--card-border)',
+                    borderRadius: '0.75rem',
+                    padding: '0.25rem',
+                    flex: 1,
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 1fr',
+                    gap: '0.25rem',
+                  }}>
+                    <TabsTrigger value="transcript">
+                      <AlignLeft size={13} /> {t('transcripts.transcriptLabel')}
+                    </TabsTrigger>
+                    <TabsTrigger value="summary">
+                      <Sparkles size={13} />
+                      {t('transcripts.summaryLabel')}
+                      {!selectedTranscript.summary && (
+                        <span style={{
+                          fontSize: '0.65rem', background: 'rgba(252,211,77,0.2)',
+                          color: 'var(--accent-yellow)', padding: '1px 5px', borderRadius: '999px',
+                          marginLeft: '0.25rem',
+                        }}>...</span>
+                      )}
+                    </TabsTrigger>
+                  </TabsList>
+                  {activeTab === 'transcript' && editingField !== 'rawTranscript' && (
+                    <Button
+                      onClick={() => startEdit('rawTranscript', selectedTranscript.rawTranscript)}
+                      size="sm" className="btn btn--ghost btn--sm"
+                      style={{ flexShrink: 0 }}
+                    >
+                      <Edit2 size={13} /> {t('transcripts.editTranscript')}
+                    </Button>
+                  )}
+                  {activeTab === 'summary' && selectedTranscript.summary && editingField !== 'summary' && (
+                    <Button
+                      onClick={() => startEdit('summary', selectedTranscript.summary)}
+                      size="sm" className="btn btn--ghost btn--sm"
+                      style={{ flexShrink: 0 }}
+                    >
+                      <Edit2 size={13} /> {t('transcripts.editSummary')}
+                    </Button>
+                  )}
+                </div>
 
                 {/* Transcript tab */}
-                <TabsContent value="transcript" style={{ marginTop: '1rem', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+                <TabsContent value="transcript" style={{ marginTop: '0.75rem', flex: 1, minHeight: 0, overflowY: 'auto' }}>
                   {editingField === 'rawTranscript' ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', flex: 1 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                       <textarea
                         className="neon-textarea"
                         value={editingText}
                         onChange={(e) => setEditingText(e.target.value)}
-                        style={{ flex: 1, minHeight: '200px', fontFamily: 'var(--font-mono)', fontSize: '0.85rem' }}
+                        style={{ minHeight: '200px', fontFamily: 'var(--font-mono)', fontSize: '0.85rem' }}
                       />
-                      <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', flexShrink: 0 }}>
+                      <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
                         <Button onClick={handleSaveEdit} disabled={isSaving} className="btn btn--sm">
                           <Save size={14} /> {isSaving ? t('common.loading') : t('transcripts.saveEdit')}
                         </Button>
@@ -259,33 +288,23 @@ const Transcripts = () => {
                       </div>
                     </div>
                   ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-                      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.5rem', flexShrink: 0 }}>
-                        <Button
-                          onClick={() => startEdit('rawTranscript', selectedTranscript.rawTranscript)}
-                          size="sm" className="btn btn--ghost btn--sm"
-                        >
-                          <Edit2 size={13} /> {t('transcripts.editTranscript')}
-                        </Button>
-                      </div>
-                      <div className="transcript-dialog__text-box" style={{ flex: 1 }}>
-                        {selectedTranscript.rawTranscript}
-                      </div>
+                    <div className="transcript-dialog__text-box">
+                      {selectedTranscript.rawTranscript}
                     </div>
                   )}
                 </TabsContent>
 
                 {/* Summary tab */}
-                <TabsContent value="summary" style={{ marginTop: '1rem', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+                <TabsContent value="summary" style={{ marginTop: '0.75rem', flex: 1, minHeight: 0, overflowY: 'auto' }}>
                   {editingField === 'summary' ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', flex: 1 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                       <textarea
                         className="neon-textarea"
                         value={editingText}
                         onChange={(e) => setEditingText(e.target.value)}
-                        style={{ flex: 1, minHeight: '180px' }}
+                        style={{ minHeight: '180px' }}
                       />
-                      <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', flexShrink: 0 }}>
+                      <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
                         <Button onClick={handleSaveEdit} disabled={isSaving} className="btn btn--sm">
                           <Save size={14} /> {isSaving ? t('common.loading') : t('transcripts.saveEdit')}
                         </Button>
@@ -295,18 +314,10 @@ const Transcripts = () => {
                       </div>
                     </div>
                   ) : selectedTranscript.summary ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-                      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.5rem', flexShrink: 0 }}>
-                        <Button
-                          onClick={() => startEdit('summary', selectedTranscript.summary)}
-                          size="sm" className="btn btn--ghost btn--sm"
-                        >
-                          <Edit2 size={13} /> {t('transcripts.editSummary')}
-                        </Button>
-                      </div>
-                      <div className="transcript-dialog__summary-box" style={{ flex: 1 }}>
+                    <div className="transcript-dialog__summary-box">
+                      <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
                         {selectedTranscript.summary}
-                      </div>
+                      </ReactMarkdown>
                     </div>
                   ) : (
                     <div className="transcript-dialog__generating">

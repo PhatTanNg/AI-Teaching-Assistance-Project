@@ -7,7 +7,8 @@
       "Bash(grep -E '^[A-Za-z][A-Za-z0-9 _-]{1,30}$')",
       "Bash(node --experimental-wasm-modules:*)",
       "Bash(node -e \":*)",
-      "Bash(node -e \"const r = require\\(''c:/AITA-Project/AI-Teaching-Assistance-Project/frontend/node_modules/@rive-app/canvas/rive.js''\\); console.log\\(Object.keys\\(r\\).filter\\(k => [''Layout'',''Fit'',''Alignment'',''Rive''].includes\\(k\\)\\)\\)\")"
+      "Bash(node -e \"const r = require\\(''c:/AITA-Project/AI-Teaching-Assistance-Project/frontend/node_modules/@rive-app/canvas/rive.js''\\); console.log\\(Object.keys\\(r\\).filter\\(k => [''Layout'',''Fit'',''Alignment'',''Rive''].includes\\(k\\)\\)\\)\")",
+      "Bash(npm list:*)"
     ]
   }
 }

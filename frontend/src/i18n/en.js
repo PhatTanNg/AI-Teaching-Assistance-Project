@@ -82,11 +82,11 @@ const en = {
     saveEdit: 'Save',
     cancelEdit: 'Cancel',
     transcriptLabel: 'Transcript',
-    summaryLabel: 'Summary',
-    noSummary: 'No summary available.',
+    summaryLabel: 'Notes',
+    noSummary: 'No notes available.',
     askAI: 'Ask AI about this',
-    summaryBadge: '✓ Summary available',
-    summaryGenerating: 'Summary is being generated…',
+    summaryBadge: '✓ Notes available',
+    summaryGenerating: 'Notes are being generated…',
     summaryGeneratingDesc: 'Reload the page in a moment to see the result.',
     noTranscriptSelected: 'No transcript selected.',
     loadFailed: 'Failed to load transcripts',
@@ -302,6 +302,7 @@ const en = {
     regenerateBtn: 'Regenerate',
     cancel: 'Cancel',
     sourcesTitle: 'Source transcripts',
+    selectMap: 'Select mind map',
   },
 };
 

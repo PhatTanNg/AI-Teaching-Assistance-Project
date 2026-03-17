@@ -68,7 +68,10 @@ export const createTranscript = async (req, res) => {
     (async () => {
       try {
         // Summarize
-        const summaryText = await generateSummary(rawTranscript.trim()).catch((e) => {
+        const summaryText = await generateSummary(rawTranscript.trim(), {
+          subject: subject.trim(),
+          date: new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+        }).catch((e) => {
           console.warn('[SUMMARY] generation failed:', e?.message || e);
           return '';
         });
@@ -239,10 +242,26 @@ export const updateTranscriptText = async (req, res) => {
       return res.status(400).json({ error: 'At least one field (rawTranscript or summary) must be provided' });
     }
 
+    // Load existing transcript first (needed for subject when regenerating notes)
+    const existing = await Transcript.findOne({ _id: transcriptId, userId });
+    if (!existing) {
+      return res.status(404).json({ error: 'Transcript not found' });
+    }
+
     // Build update object with only provided fields
     const updateData = {};
     if (rawTranscript !== undefined) {
       updateData.rawTranscript = rawTranscript.trim();
+      // Regenerate notes synchronously when transcript text changes
+      try {
+        const newSummary = await generateSummary(updateData.rawTranscript, {
+          subject: existing.subject || '',
+          date: new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+        });
+        if (newSummary) updateData.summary = newSummary;
+      } catch (e) {
+        console.warn('[SUMMARY] Re-generation on edit failed:', e?.message || e);
+      }
     }
     if (summary !== undefined) {
       updateData.summary = summary.trim();
