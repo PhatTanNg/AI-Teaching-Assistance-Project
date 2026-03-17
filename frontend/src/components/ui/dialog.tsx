@@ -55,6 +55,7 @@ function DialogOverlay({
 function DialogContent({
   className,
   children,
+  style,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content>) {
   return (
@@ -82,6 +83,7 @@ function DialogContent({
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
+          ...style,
         }}
         {...props}
       >
