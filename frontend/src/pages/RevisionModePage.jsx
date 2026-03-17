@@ -124,7 +124,7 @@ export default function RevisionModePage() {
       </div>
 
       {error && (
-        <div style={{ padding: '1rem', background: 'rgba(251,113,133,0.08)', border: '1px solid rgba(251,113,133,0.2)', borderRadius: '0.75rem', color: 'var(--accent-rose)', marginBottom: '1.5rem' }}>
+        <div style={{ padding: '1rem', background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.2)', borderRadius: '0.75rem', color: 'var(--accent-red)', marginBottom: '1.5rem' }}>
           {error}
         </div>
       )}

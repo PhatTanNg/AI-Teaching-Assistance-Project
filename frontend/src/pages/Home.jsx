@@ -13,19 +13,19 @@ import {
 } from 'lucide-react';
 
 const accentColor = {
-  cyan:   'rgba(110,231,247,0.12)',
+  cyan:   'rgba(245,166,35,0.12)',   /* amber — primary */
   purple: 'rgba(167,139,250,0.12)',
-  green:  'rgba(74,222,128,0.12)',
+  green:  'rgba(45,212,191,0.12)',   /* teal — study features */
 };
 const accentText = {
-  cyan:   'var(--accent-primary)',
+  cyan:   'var(--accent-primary)',   /* amber */
   purple: 'var(--accent-purple)',
-  green:  'var(--accent-green)',
+  green:  'var(--accent-teal)',
 };
 const accentGradient = {
-  cyan:   'linear-gradient(135deg, rgba(110,231,247,0.07) 0%, transparent 60%)',
-  purple: 'linear-gradient(135deg, rgba(167,139,250,0.07) 0%, transparent 60%)',
-  green:  'linear-gradient(135deg, rgba(74,222,128,0.07)  0%, transparent 60%)',
+  cyan:   'linear-gradient(135deg, rgba(245,166,35,0.08) 0%, transparent 60%)',
+  purple: 'linear-gradient(135deg, rgba(167,139,250,0.08) 0%, transparent 60%)',
+  green:  'linear-gradient(135deg, rgba(45,212,191,0.07)  0%, transparent 60%)',
 };
 
 const Home = () => {
@@ -90,7 +90,7 @@ const Home = () => {
       {/* ── Hero ── */}
       <section className="home__hero card card--wide" aria-labelledby="home-hero-title">
         <div className="home__eyebrow">
-          {isAuthenticated ? `👋 Hey, ${user?.displayName ?? user?.username}!` : '✦ Smarter note-taking for modern students'}
+          {isAuthenticated ? `✦ Welcome back, ${user?.displayName ?? user?.username}` : '✦ AI-powered lecture notes for every student'}
         </div>
         <h1 id="home-hero-title" className="home__title">
           {isAuthenticated ? (
@@ -111,7 +111,7 @@ const Home = () => {
         </h1>
         <p className="home__subtitle">
           {isAuthenticated
-            ? 'Record → AI extracts keywords → Study with flashcards & quizzes. That easy.'
+            ? 'Record a lecture → AI extracts keywords → Study with flashcards & quizzes. Simple as that.'
             : t('home.heroSub')}
         </p>
         <div className="home__actions">

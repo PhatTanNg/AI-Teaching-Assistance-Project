@@ -28,6 +28,24 @@ const ForgotPassword = () => {
   return (
     <div className="auth-page">
       <div className="auth-card">
+        <div className="auth-brand-mark">
+          <div className="auth-brand-mark__icon">
+            <svg width="28" height="28" viewBox="0 0 40 40" fill="none">
+              <ellipse cx="20" cy="22" rx="12" ry="11" fill="#7A3F1E"/>
+              <ellipse cx="20" cy="22" rx="9" ry="8" fill="#C8874A"/>
+              <ellipse cx="14" cy="17" rx="4" ry="4.5" fill="#7A3F1E"/>
+              <ellipse cx="26" cy="17" rx="4" ry="4.5" fill="#7A3F1E"/>
+              <circle cx="14" cy="16" r="2.5" fill="#F0D0A0"/>
+              <circle cx="26" cy="16" r="2.5" fill="#F0D0A0"/>
+              <circle cx="14.5" cy="15.5" r="1.2" fill="#1a0800"/>
+              <circle cx="26.5" cy="15.5" r="1.2" fill="#1a0800"/>
+              <ellipse cx="20" cy="25" rx="4" ry="2.5" fill="#F0D0A0"/>
+              <ellipse cx="10" cy="21" rx="3" ry="3.5" fill="#C8874A"/>
+              <ellipse cx="30" cy="21" rx="3" ry="3.5" fill="#C8874A"/>
+            </svg>
+          </div>
+          <span className="auth-brand-mark__name">AITA</span>
+        </div>
         <h2>{t('auth.forgotPasswordTitle')}</h2>
         <p className="card__subtitle">{t('auth.forgotPasswordDesc')}</p>
 

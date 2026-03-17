@@ -158,8 +158,8 @@ const Transcripts = () => {
                 {tr.subject || 'Untitled'}
               </h3>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
-                <Calendar size={14} />
+              <div className="transcript-card__date">
+                <Calendar size={11} />
                 {new Date(tr.transcribedAt).toLocaleDateString()}
               </div>
 
@@ -191,7 +191,7 @@ const Transcripts = () => {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                   <div style={{
                     width: 40, height: 40, borderRadius: '0.75rem', flexShrink: 0,
-                    background: 'rgba(110,231,247,0.1)', border: '1px solid rgba(110,231,247,0.2)',
+                    background: 'rgba(245,166,35,0.1)', border: '1px solid rgba(245,166,35,0.2)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     color: 'var(--accent-primary)'
                   }}>

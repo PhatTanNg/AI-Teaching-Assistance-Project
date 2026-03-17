@@ -4,6 +4,7 @@ import { useTheme } from 'next-themes';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useLanguage } from '../context/LanguageContext.jsx';
 import { Mic, FileText, BookMarked, Target, GitFork, LogOut, Moon, Sun, ChevronLeft, ChevronRight, User } from 'lucide-react';
+import RiveAvatar from './RiveAvatar.jsx';
 
 export default function Sidebar({ collapsed = false, onCollapse }) {
   const { user, logout } = useAuth();
@@ -24,8 +25,9 @@ export default function Sidebar({ collapsed = false, onCollapse }) {
 
   const initials = (user?.displayName?.[0] || user?.username?.[0] || '?').toUpperCase();
   const displayName = user?.displayName ?? user?.username;
+  const isRiveAvatar = user?.avatarUrl?.startsWith('rive:');
   const isImageAvatar = user?.avatarUrl && (user.avatarUrl.startsWith('data:') || user.avatarUrl.startsWith('http'));
-  const isEmojiAvatar = user?.avatarUrl && !isImageAvatar;
+  const isEmojiAvatar = user?.avatarUrl && !isImageAvatar && !isRiveAvatar;
 
   return (
     <>
@@ -89,7 +91,9 @@ export default function Sidebar({ collapsed = false, onCollapse }) {
               aria-label={`${t('nav.profile')}: ${displayName}`}
               style={{ textDecoration: 'none' }}
             >
-              {isImageAvatar ? (
+              {isRiveAvatar ? (
+                <RiveAvatar artboard={user.avatarUrl.replace('rive:', '')} size="full" />
+              ) : isImageAvatar ? (
                 <img src={user.avatarUrl} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
               ) : isEmojiAvatar ? (
                 <span style={{ fontSize: '1.3rem', lineHeight: 1 }}>{user.avatarUrl}</span>

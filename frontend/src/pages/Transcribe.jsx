@@ -592,7 +592,7 @@ const Transcribe = () => {
 
                 {/* Transcript area */}
                 {!transcriptionStopped ? (
-                  <div className="transcript-display" onMouseUp={handleTextSelection}>
+                  <div className={`transcript-display${isRecording ? ' transcript-display--recording' : ''}`} onMouseUp={handleTextSelection}>
                     {correctedText || pendingChunks.length > 0 || interimText ? (
                       <>
                         <span>{correctedText}</span>
@@ -644,15 +644,7 @@ const Transcribe = () => {
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={handleFileDrop}
                   onClick={() => document.getElementById('audio-upload-input').click()}
-                  style={{
-                    border: `2px dashed ${uploadFile ? 'var(--accent-primary)' : 'var(--card-border)'}`,
-                    borderRadius: '0.75rem',
-                    padding: '2rem 1.5rem',
-                    textAlign: 'center',
-                    cursor: 'pointer',
-                    transition: 'border-color 0.2s',
-                    background: uploadFile ? 'rgba(110,231,247,0.04)' : 'transparent',
-                  }}>
+                  className={`upload-zone${uploadFile ? ' upload-zone--active' : ''}`}>
                   <input id="audio-upload-input" type="file"
                     accept=".mp3,.m4a,.wav,.ogg,.webm,.flac"
                     style={{ display: 'none' }}
@@ -735,29 +727,25 @@ const Transcribe = () => {
 
             {/* ── AI Correction diff panel ── */}
             {correctionDiff && (
-              <div style={{
-                padding: '1rem', borderRadius: '0.75rem',
-                border: '1px solid var(--accent-primary)',
-                background: 'rgba(110,231,247,0.04)',
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                  <span style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--accent-primary)' }}>
+              <div className="correction-diff-panel">
+                <div className="correction-diff-panel__header">
+                  <span style={{ fontWeight: 700, fontSize: '0.8rem', color: 'var(--accent-primary)', letterSpacing: '0.02em' }}>
                     ✨ {t('transcribe.correctionTitle')}
                   </span>
                   <button type="button" onClick={() => setCorrectionDiff(null)}
-                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '0.25rem' }}>
+                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '0.25rem', lineHeight: 1 }}>
                     <X size={14} />
                   </button>
                 </div>
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.5rem', lineHeight: 1.6, maxHeight: '180px', overflowY: 'auto' }}>
-                  <div style={{ color: 'var(--accent-red)', textDecoration: 'line-through', marginBottom: '0.5rem' }}>
+                <div style={{ maxHeight: '180px', overflowY: 'auto' }}>
+                  <div className="correction-diff-panel__before">
                     {correctionDiff.original.slice(0, 300)}{correctionDiff.original.length > 300 ? '…' : ''}
                   </div>
-                  <div style={{ color: 'var(--accent-green)' }}>
+                  <div className="correction-diff-panel__after">
                     {correctionDiff.corrected.slice(0, 300)}{correctionDiff.corrected.length > 300 ? '…' : ''}
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
+                <div className="correction-diff-panel__actions">
                   <button type="button" className="btn btn--sm" onClick={acceptCorrection}>
                     ✅ {t('transcribe.acceptCorrection')}
                   </button>
@@ -770,11 +758,7 @@ const Transcribe = () => {
 
             {/* ── AI correction suggestion (post-transcription) ── */}
             {transcriptionStopped && hasEnoughForCorrection && !correctionDiff && !isCorrectingFull && (
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.75rem 1rem',
-                borderRadius: '0.75rem', background: 'rgba(167,139,250,0.06)',
-                border: '1px solid rgba(167,139,250,0.2)',
-              }}>
+              <div className="ai-suggest-banner">
                 <Sparkles size={16} style={{ color: 'var(--accent-purple)', flexShrink: 0 }} />
                 <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', flex: 1 }}>
                   {t('transcribe.correctBtn')}
@@ -803,8 +787,8 @@ const Transcribe = () => {
 
             {isSummarizing && (
               <div style={{
-                padding: '1rem', background: 'rgba(110,231,247,0.06)',
-                border: '1px solid rgba(110,231,247,0.15)',
+                padding: '1rem', background: 'rgba(245,166,35,0.06)',
+                border: '1px solid rgba(245,166,35,0.15)',
                 borderRadius: '0.75rem', fontSize: '0.875rem', color: 'var(--accent-primary)' }}>
                 ⏳ Summary is generated automatically after save.
               </div>
@@ -818,7 +802,7 @@ const Transcribe = () => {
             <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-primary)' }}>
               {t('transcribe.keywordsTitle')} ({keywords.length})
             </h3>
-            {isAnalyzing && <span className="tag tag--cyan" style={{ fontSize: '0.7rem' }}>{t('transcribe.analyzing')}</span>}
+            {isAnalyzing && <span className="tag tag--teal" style={{ fontSize: '0.7rem' }}>{t('transcribe.analyzing')}</span>}
           </div>
 
           {keywords.length === 0 ? (
@@ -833,7 +817,7 @@ const Transcribe = () => {
                     <div style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
                       {kw.text}
                       {kw.source && (
-                        <span className={`tag tag--${kw.source === 'ai' ? 'cyan' : 'yellow'}`}>
+                        <span className={`tag tag--${kw.source === 'ai' ? 'teal' : 'yellow'}`}>
                           {kw.source === 'ai' ? t('transcribe.keywordSource_ai') : t('transcribe.keywordSource_manual')}
                         </span>
                       )}

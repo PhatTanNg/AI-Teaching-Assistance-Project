@@ -240,7 +240,7 @@ const Keywords = () => {
                 {filteredKeywords.map(keyword => (
                   <div key={keyword._id} className="keyword-item">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
-                      <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: 'var(--accent-cyan)' }}>{keyword.keywordText}</h4>
+                      <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: 'var(--accent-primary)' }}>{keyword.keywordText}</h4>
                       <div style={{ display: 'flex', gap: '0.25rem' }}>
                         {editingKeywordId === keyword._id ? (
                           <>
@@ -257,7 +257,7 @@ const Keywords = () => {
                               <Edit2 size={14} />
                             </Button>
                             <Button onClick={() => handleDeleteKeyword(keywordGroups[0]._id, keyword._id)} size="sm"
-                              className="btn btn--ghost btn--sm" style={{ color: 'var(--accent-rose)' }}>
+                              className="btn btn--ghost btn--sm" style={{ color: 'var(--accent-red)' }}>
                               <Trash2 size={14} />
                             </Button>
                           </>

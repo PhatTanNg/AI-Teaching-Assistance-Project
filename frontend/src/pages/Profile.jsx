@@ -4,11 +4,27 @@ import { Moon, Sun, LogOut, Trash2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useLanguage } from '../context/LanguageContext.jsx';
 import { apiClient } from '../api/client.js';
+import RiveAvatar from '../components/RiveAvatar.jsx';
 
-const PRESET_AVATARS = ['🐒', '🐼', '🦊', '🐨', '🦁', '🐸', '🦋', '🐧', '🦉', '🐺', '🦝', '🐻', '🐯', '🦄', '🐙', '🦈'];
+// 42 artboards extracted from /avatars/avatars.riv
+const RIVE_AVATARS = [
+  '01_Star','02_Heart','03_Flash','04_Blink','05_Flower',
+  '06_Diamon','07_Candy','08_Rabbit','09_Duck','10_Lollipop',
+  '11_Chat','12_Cat','13_Cloud','14_Strawberry','15_Skull',
+  '16_Bear','17_Moon','18_Cherry','19_Comet','20_IceCream',
+  '21_Crown','22_Plant','23_Coin','24_Chili','25_Cassette',
+  '26_Fire','27_Mail','28_Juice','29_Rock','30_Sugar',
+  '31_Cigarette','32_PopCorn','33_Floppy','34_Phone','35_Sun',
+  '36_Bow','37_Bomb','38_Gun','39_Bandaid','40_Egg',
+  '41_Coffee','42_Star 2',
+];
+
+const isRiveAvatar = (url) => url?.startsWith('rive:');
+const getRiveArtboard = (url) => url?.replace('rive:', '');
 
 const Profile = () => {
   const { token, user, refreshProfile, logout } = useAuth();
+
   const { t, lang, setLang } = useLanguage();
   const { theme, setTheme } = useTheme();
   const isDark = theme !== 'light';
@@ -155,13 +171,13 @@ const Profile = () => {
 
   const createdAt = user.createdAt ? new Date(user.createdAt).toLocaleDateString() : '—';
   const isImageUrl = user.avatarUrl && (user.avatarUrl.startsWith('data:') || user.avatarUrl.startsWith('http'));
-  const isEmojiAvatar = user.avatarUrl && !isImageUrl;
+  const isEmojiAvatar = user.avatarUrl && !isImageUrl && !isRiveAvatar(user.avatarUrl);
   const avatarInitial = (user.displayName?.[0] || user.username?.[0] || '?').toUpperCase();
 
   return (
     <div className="page">
       {/* ── Account Info ── */}
-      <section className="card card--wide" style={{ marginBottom: '1.5rem' }}>
+      <section className="card card--wide card--accent-left" style={{ marginBottom: '1.5rem' }}>
         <div className="card__header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
             {/* Avatar */}
@@ -169,6 +185,7 @@ const Profile = () => {
               type="button"
               onClick={() => setShowAvatarPicker(true)}
               title={t('profile.changeAvatar')}
+              className="profile-avatar-btn"
               style={{
                 width: 56, height: 56, borderRadius: '50%',
                 background: 'var(--bg-elevated)',
@@ -179,10 +196,10 @@ const Profile = () => {
                 color: 'var(--accent-primary)', transition: 'border-color 0.2s',
                 overflow: 'hidden', padding: 0, outline: 'none',
               }}
-              onMouseOver={e => e.currentTarget.style.borderColor = 'var(--accent-primary)'}
-              onMouseOut={e => e.currentTarget.style.borderColor = 'var(--card-border)'}
             >
-              {isImageUrl ? (
+              {isRiveAvatar(user.avatarUrl) ? (
+                <RiveAvatar artboard={getRiveArtboard(user.avatarUrl)} size={56} />
+              ) : isImageUrl ? (
                 <img src={user.avatarUrl} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
               ) : (
                 isEmojiAvatar ? user.avatarUrl : avatarInitial
@@ -273,7 +290,7 @@ const Profile = () => {
       </section>
 
       {/* ── Preferences ── */}
-      <section className="card card--wide" style={{ marginBottom: '1.5rem' }}>
+      <section className="card card--wide card--accent-left" style={{ marginBottom: '1.5rem' }}>
         <h3 className="card__title" style={{ fontSize: '1rem', marginBottom: '1rem' }}>
           {t('profile.preferences')}
         </h3>
@@ -281,37 +298,35 @@ const Profile = () => {
           {/* Theme */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
             <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{t('profile.theme')}</span>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <div className="profile-toggle-group">
               <button
                 type="button"
-                className={`btn btn--sm${isDark ? '' : ' btn--ghost'}`}
+                className={`profile-toggle-btn${isDark ? ' profile-toggle-btn--active' : ''}`}
                 onClick={() => setTheme('dark')}
-                style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}
               >
-                <Moon size={14} /> {t('profile.themeDark')}
+                <Moon size={12} style={{ display: 'inline', verticalAlign: '-1px', marginRight: '0.3rem' }} />{t('profile.themeDark')}
               </button>
               <button
                 type="button"
-                className={`btn btn--sm${!isDark ? '' : ' btn--ghost'}`}
+                className={`profile-toggle-btn${!isDark ? ' profile-toggle-btn--active' : ''}`}
                 onClick={() => setTheme('light')}
-                style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}
               >
-                <Sun size={14} /> {t('profile.themeLight')}
+                <Sun size={12} style={{ display: 'inline', verticalAlign: '-1px', marginRight: '0.3rem' }} />{t('profile.themeLight')}
               </button>
             </div>
           </div>
           {/* Language */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
             <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{t('profile.uiLanguage')}</span>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <div className="profile-toggle-group">
               {['en', 'vi'].map((l) => (
                 <button
                   key={l}
                   type="button"
-                  className={`btn btn--sm${lang === l ? '' : ' btn--ghost'}`}
+                  className={`profile-toggle-btn${lang === l ? ' profile-toggle-btn--active' : ''}`}
                   onClick={() => setLang(l)}
                 >
-                  {l === 'vi' ? '🇻🇳 Tiếng Việt' : '🇬🇧 English'}
+                  {l === 'vi' ? '🇻🇳 Việt' : '🇬🇧 EN'}
                 </button>
               ))}
             </div>
@@ -322,19 +337,28 @@ const Profile = () => {
               <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{t('profile.showBackground')}</span>
               <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '2px 0 0' }}>{t('profile.showBackgroundDesc')}</p>
             </div>
-            <button
-              type="button"
-              className={`btn btn--sm${showBg ? '' : ' btn--ghost'}`}
-              onClick={() => toggleBg(!showBg)}
-            >
-              {showBg ? t('profile.bgOn') : t('profile.bgOff')}
-            </button>
+            <div className="profile-toggle-group">
+              <button
+                type="button"
+                className={`profile-toggle-btn${showBg ? ' profile-toggle-btn--active' : ''}`}
+                onClick={() => toggleBg(true)}
+              >
+                {t('profile.bgOn')}
+              </button>
+              <button
+                type="button"
+                className={`profile-toggle-btn${!showBg ? ' profile-toggle-btn--active' : ''}`}
+                onClick={() => toggleBg(false)}
+              >
+                {t('profile.bgOff')}
+              </button>
+            </div>
           </div>
         </div>
       </section>
 
       {/* ── Change Password ── */}
-      <section className="card card--wide" style={{ marginBottom: '1.5rem' }}>
+      <section className="card card--wide card--accent-left" style={{ marginBottom: '1.5rem' }}>
         <div className="card__header">
           <h3 className="card__title" style={{ fontSize: '1rem' }}>{t('profile.changePassword')}</h3>
           {!showPasswordForm && (
@@ -384,7 +408,7 @@ const Profile = () => {
       </section>
 
       {/* ── Session / Logout ── */}
-      <section className="card card--wide" style={{ marginBottom: '1.5rem' }}>
+      <section className="card card--wide card--accent-left" style={{ marginBottom: '1.5rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
           <div>
             <h3 className="card__title" style={{ fontSize: '1rem', marginBottom: '0.25rem' }}>{t('profile.logoutSection')}</h3>
@@ -402,7 +426,7 @@ const Profile = () => {
       </section>
 
       {/* ── Danger Zone ── */}
-      <section className="card card--wide" style={{ borderColor: 'rgba(239,68,68,0.35)', marginBottom: '1.5rem' }}>
+      <section className="card card--wide card--danger" style={{ marginBottom: '1.5rem' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
           <div>
             <h3 className="card__title" style={{ fontSize: '1rem', color: 'var(--accent-red)', marginBottom: '0.25rem' }}>
@@ -436,7 +460,7 @@ const Profile = () => {
           <div
             style={{
               background: 'var(--bg-elevated)', borderRadius: '1rem', padding: '1.5rem',
-              border: '1px solid var(--card-border)', maxWidth: '340px', width: '100%',
+              border: '1px solid var(--card-border)', maxWidth: '560px', width: '100%',
             }}
             onClick={e => e.stopPropagation()}
           >
@@ -468,26 +492,44 @@ const Profile = () => {
               📷 {t('profile.uploadPhoto')}
             </button>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem' }}>
-              {PRESET_AVATARS.map((emoji) => (
-                <button
-                  key={emoji}
-                  type="button"
-                  onClick={() => handleAvatarSelect(emoji)}
-                  disabled={isSavingAvatar}
-                  style={{
-                    fontSize: '2rem', padding: '0.5rem', borderRadius: '0.5rem',
-                    border: user.avatarUrl === emoji ? '2px solid var(--accent-primary)' : '2px solid transparent',
-                    background: user.avatarUrl === emoji ? 'var(--bg-secondary)' : 'transparent',
-                    cursor: 'pointer', transition: 'background 0.15s',
-                    outline: 'none', aspectRatio: '1',
-                  }}
-                  onMouseOver={e => e.currentTarget.style.background = 'var(--bg-secondary)'}
-                  onMouseOut={e => e.currentTarget.style.background = user.avatarUrl === emoji ? 'var(--bg-secondary)' : 'transparent'}
-                >
-                  {emoji}
-                </button>
-              ))}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(5, 1fr)',
+              columnGap: '0.75rem',
+              rowGap: '1.25rem',
+              maxHeight: '480px',
+              overflowY: 'auto',
+              paddingRight: '6px',
+              paddingBottom: '4px',
+            }}>
+              {RIVE_AVATARS.map((artboard) => {
+                const key = `rive:${artboard}`;
+                const selected = user.avatarUrl === key;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    title={artboard.replace(/^\d+_/, '')}
+                    onClick={() => handleAvatarSelect(key)}
+                    disabled={isSavingAvatar}
+                    style={{
+                      borderRadius: '0.75rem',
+                      border: selected ? '2px solid var(--accent-primary)' : '2px solid transparent',
+                      background: selected ? 'rgba(110,231,247,0.08)' : 'var(--bg-secondary)',
+                      cursor: 'pointer', outline: 'none',
+                      width: '100%', height: '88px',
+                      overflow: 'hidden', padding: '8px',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      boxSizing: 'border-box',
+                      transition: 'border-color 0.15s, background 0.15s',
+                    }}
+                    onMouseOver={e => { if (!selected) e.currentTarget.style.borderColor = 'var(--card-border)'; }}
+                    onMouseOut={e => { if (!selected) e.currentTarget.style.borderColor = 'transparent'; }}
+                  >
+                    <RiveAvatar artboard={artboard} size="full" />
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
