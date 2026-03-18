@@ -282,18 +282,19 @@ const Transcribe = () => {
   /* ── Recording controls ── */
   const startRecording = () => {
     if (recognitionRef.current) {
-      recognitionRef.current.start();
+      try { recognitionRef.current.start(); } catch (_) {}
       setIsRecording(true);
       setTranscriptionStopped(false);
     }
   };
 
   const stopRecording = () => {
+    isRecordingRef.current = false; // sync before stop — prevents onend from restarting
     if (demoMode) {
       setDemoMode(false);
       if (demoIntervalRef.current) clearInterval(demoIntervalRef.current);
     } else if (recognitionRef.current) {
-      recognitionRef.current.stop();
+      try { recognitionRef.current.stop(); } catch (_) {}
     }
     setIsRecording(false);
     setTranscriptionStopped(true);
