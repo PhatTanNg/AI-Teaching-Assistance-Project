@@ -39,7 +39,8 @@ function renderMarkdown(text) {
     listType = null;
   };
 
-  for (const line of lines) {
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
     const heading = line.match(/^#{1,3}\s+(.+)/);
     const ulItem  = line.match(/^[-*]\s+(.*)/);
     const olItem  = line.match(/^\d+\.\s+(.*)/);
@@ -56,8 +57,15 @@ function renderMarkdown(text) {
       listType = 'ol';
       listItems.push(olItem[1]);
     } else if (line.trim() === '') {
-      flushList();
-      if (elements.length) elements.push(<div key={key++} style={{ height: '0.35rem' }} />);
+      // Don't flush if the next non-blank line continues the same list type
+      const nextLine = lines.slice(i + 1).find(l => l.trim() !== '');
+      const nextIsUl = nextLine && /^[-*]\s+/.test(nextLine);
+      const nextIsOl = nextLine && /^\d+\.\s+/.test(nextLine);
+      const continuesList = (listType === 'ul' && nextIsUl) || (listType === 'ol' && nextIsOl);
+      if (!continuesList) {
+        flushList();
+        if (elements.length) elements.push(<div key={key++} style={{ height: '0.35rem' }} />);
+      }
     } else {
       flushList();
       elements.push(<p key={key++} style={{ margin: '0.1rem 0' }}>{inlineMarkdown(line)}</p>);

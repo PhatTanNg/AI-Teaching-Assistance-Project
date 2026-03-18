@@ -1,12 +1,14 @@
 import mongoose from 'mongoose';
 import {
   RevisionSet,
+  RevisionSetTranscript,
   McqQuestion,
   McqAttempt,
   StudentProgress,
 } from '../models/revisionModels.js';
 
 const StudySession = mongoose.models.StudySession;
+const Transcript = mongoose.models.Transcript || mongoose.model('Transcript', new mongoose.Schema({ subject: String }, { strict: false }));
 
 const startOfUtcDay = (date) => {
   const d = new Date(date);
@@ -139,12 +141,29 @@ export const getWeakTopics = async ({ studentId }) => {
   const questions = await McqQuestion.find({ _id: { $in: questionIds } }).lean();
   const questionMap = new Map(questions.map((q) => [String(q._id), q]));
 
+  // Build setId → transcript subject map
+  const setIds = [...new Set(questions.map((q) => String(q.setId)).filter(Boolean))];
+  const setTranscripts = setIds.length > 0
+    ? await RevisionSetTranscript.find({ setId: { $in: setIds } }).lean()
+    : [];
+  const transcriptIds = [...new Set(setTranscripts.map((st) => String(st.transcriptId)))];
+  const transcripts = transcriptIds.length > 0
+    ? await Transcript.find({ _id: { $in: transcriptIds } }, { subject: 1 }).lean()
+    : [];
+  const transcriptMap = new Map(transcripts.map((t) => [String(t._id), t.subject]));
+  const setSubjectMap = new Map();
+  for (const st of setTranscripts) {
+    if (!setSubjectMap.has(String(st.setId))) {
+      setSubjectMap.set(String(st.setId), transcriptMap.get(String(st.transcriptId)));
+    }
+  }
+
   const grouped = new Map();
 
   for (const attempt of attempts) {
     const question = questionMap.get(String(attempt.questionId));
-    const sourceRef = question?.sourceRef || 'General Topic';
-    const topic = sourceRef.split(',')[0].trim() || 'General Topic';
+    const subject = setSubjectMap.get(String(question?.setId));
+    const topic = subject || question?.sourceRef?.split(',')[0]?.trim() || 'General Topic';
 
     if (!grouped.has(topic)) {
       grouped.set(topic, { topic, total: 0, correct: 0 });

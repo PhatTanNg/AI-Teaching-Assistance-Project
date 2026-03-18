@@ -284,7 +284,7 @@ const Transcripts = () => {
                     size="sm"
                     className="btn btn--ghost btn--sm"
                     style={{ flexShrink: 0 }}
-                    onClick={() => { printNote(selectedTranscript); setIsDialogOpen(false); }}
+                    onClick={() => { setIsDialogOpen(false); printNote(selectedTranscript); }}
                     title={t('transcripts.downloadPdf')}
                   >
                     <Download size={14} />

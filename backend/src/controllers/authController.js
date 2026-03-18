@@ -112,11 +112,11 @@ export const signIn = async (req, res) => {
 
     const user = await User.findOne({ $or: [{ username: usernameOrEmail }, { email: usernameOrEmail }] });
     if (!user) {
-      return res.status(401).json({ message: 'Invalid credentials' });
+      return res.status(401).json({ message: 'No account found with that username or email.' });
     }
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      return res.status(401).json({ message: 'Invalid credentials' });
+      return res.status(401).json({ message: 'Incorrect password. Please try again.' });
     }
 
     const accessToken = jwt.sign(

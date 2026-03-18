@@ -2049,7 +2049,7 @@ html.light .transcript-card:hover {
 }
 
 .flashcard-front {
-  background: linear-gradient(135deg, rgba(28,32,56,0.9), rgba(20,23,40,0.95));
+  background: var(--bg-elevated);
 }
 
 .flashcard-label {
@@ -2089,7 +2089,7 @@ html.light .transcript-card:hover {
 }
 
 .flashcard-back {
-  background: linear-gradient(135deg, rgba(28,32,56,0.95), rgba(20,23,40,0.9));
+  background: var(--bg-elevated);
   transform: rotateY(180deg);
 }
 
@@ -3409,7 +3409,12 @@ html.light .transcript-card:hover {
 .mindmap-layout {
   display: grid;
   grid-template-columns: 260px 1fr;
-  height: calc(100vh - var(--bottom-nav-height));
+  /* Break out of app-main padding so the canvas fills the full available area */
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: var(--bottom-nav-height);
   overflow: hidden;
 }
 
@@ -3784,7 +3789,6 @@ html.light .transcript-card:hover {
 @media (max-width: 640px) {
   .mindmap-layout {
     grid-template-columns: 1fr;
-    height: calc(100vh - var(--bottom-nav-height) - 1rem);
   }
 
   .mindmap-library {
@@ -3996,10 +4000,11 @@ html.light .transcript-card:hover {
    SCREEN 6 — REVISION — ENHANCEMENTS
    ============================================= */
 
-/* Flashcard — lime glow on answer reveal */
+/* Flashcard — teal tint on answer reveal */
 .flashcard-back {
   background: linear-gradient(135deg, var(--bg-elevated) 0%, rgba(45,212,191,0.04) 100%);
   border: 1px solid rgba(45,212,191,0.15) !important;
+  transform: rotateY(180deg);
 }
 
 /* When flipped, the container gets a brief glow */

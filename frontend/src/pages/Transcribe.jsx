@@ -843,6 +843,11 @@ const Transcribe = () => {
             )}
 
             {/* ── Save / Clear ── */}
+            {saveError && (
+              <Alert variant="destructive" style={{ marginBottom: '0.5rem' }}>
+                <AlertDescription>{saveError}</AlertDescription>
+              </Alert>
+            )}
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
               <Button onClick={saveTranscript} disabled={isSaving} className="btn">
                 <Save size={16} /> {isSaving ? t('transcribe.saving') : t('transcribe.saveBtn')}

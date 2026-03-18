@@ -134,9 +134,12 @@ export function printNote(transcript) {
       throwOnError: false,
     });
 
-    // Auto-print after resources load
+    // Auto-print after resources load, then close tab
     window.addEventListener('load', () => {
-      setTimeout(() => { window.print(); }, 400);
+      setTimeout(() => {
+        window.print();
+        window.close();
+      }, 400);
     });
   <\/script>
 </body>

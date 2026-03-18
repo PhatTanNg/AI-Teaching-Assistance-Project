@@ -9,6 +9,7 @@ import {
   getKeywordGroupsByTranscript,
   getKeywordsBySession,
   createKeywords,
+  createKeywordGroup,
   updateKeywordDefinition,
   removeKeywordFromGroup,
   addKeywordToGroup,
@@ -53,15 +54,21 @@ const Keywords = () => {
     const loadKeywords = async () => {
       if (!selectedTranscript || !token) return;
       try {
+        // Always try real keyword groups first
+        const realGroups = await getKeywordGroupsByTranscript(token, selectedTranscript);
+        if (realGroups.length > 0) {
+          setKeywordGroups(realGroups);
+          return;
+        }
+        // Fall back to legacy sessionId-based keywords (read-only)
         const transcriptObj = transcripts.find(t => t._id === selectedTranscript);
-        if (!transcriptObj) { setKeywordGroups([]); return; }
-
-        if (transcriptObj.sessionId) {
+        if (transcriptObj?.sessionId) {
           const kws = await getKeywordsBySession(token, transcriptObj.sessionId);
-          setKeywordGroups([{ _id: transcriptObj.sessionId, isLegacy: true, transcriptId: selectedTranscript, keywords: kws }]);
+          setKeywordGroups(kws.length > 0
+            ? [{ _id: transcriptObj.sessionId, isLegacy: true, transcriptId: selectedTranscript, keywords: kws }]
+            : []);
         } else {
-          const data = await getKeywordGroupsByTranscript(token, selectedTranscript);
-          setKeywordGroups(data);
+          setKeywordGroups([]);
         }
       } catch (err) {
         console.error('Error loading keywords:', err);
@@ -116,22 +123,21 @@ const Keywords = () => {
       return;
     }
     if (!token) { setError('Not authenticated'); return; }
-    const realGroup = keywordGroups.find(g => !g.isLegacy);
-    if (!realGroup) {
-      setError(
-        keywordGroups.length === 0
-          ? 'No keyword group found for this transcript. Generate keywords first.'
-          : 'This transcript uses legacy keyword storage — manual add is not supported.'
-      );
-      return;
-    }
     try {
-      const result = await addKeywordToGroup(token, realGroup._id, {
+      let targetGroup = keywordGroups.find(g => !g.isLegacy);
+      if (!targetGroup) {
+        // No real group yet — create one for this transcript on the fly
+        targetGroup = await createKeywordGroup(token, {
+          transcriptId: selectedTranscript,
+          studyDate: new Date().toISOString(),
+        });
+        setKeywordGroups(prev => [...prev.filter(g => !g.isLegacy), targetGroup]);
+      }
+      const result = await addKeywordToGroup(token, targetGroup._id, {
         keywordText: newKeywordText.trim(),
         definition: newKeywordDef.trim(),
       });
-      // Backend returns the updated keyword group with populated keywords
-      setKeywordGroups(prev => prev.map(g => g._id === realGroup._id ? result : g));
+      setKeywordGroups(prev => prev.map(g => g._id === targetGroup._id ? result : g));
       setNewKeywordText('');
       setNewKeywordDef('');
       setSuccessMessage('Keyword added successfully');

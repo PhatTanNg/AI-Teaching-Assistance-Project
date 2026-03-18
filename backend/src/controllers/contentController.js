@@ -315,9 +315,9 @@ export const createKeywordGroup = async (req, res) => {
   try {
     const { transcriptId, lectureId, studyDate, keywords } = req.body;
 
-    if (!transcriptId || !lectureId || !studyDate) {
+    if (!transcriptId || !studyDate) {
       return res.status(400).json({
-        error: 'transcriptId, lectureId, and studyDate are required',
+        error: 'transcriptId and studyDate are required',
       });
     }
 
