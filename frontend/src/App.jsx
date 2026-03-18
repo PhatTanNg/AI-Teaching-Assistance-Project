@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, Outlet, Link } from 'react-router-dom';
 import { useTheme } from 'next-themes';
 import { Moon, Sun } from 'lucide-react';
@@ -7,7 +7,7 @@ import MonkeyChat from './components/MonkeyChat.jsx';
 import { Toaster } from './components/ui/sonner';
 import OnboardingModal, { useOnboarding } from './components/OnboardingModal.jsx';
 import ThemeTransition from './components/ThemeTransition.jsx';
-import FloatingBackground from './components/FloatingBackground.jsx';
+const FloatingBackground = lazy(() => import('./components/FloatingBackground.jsx'));
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import { useAuth } from './context/AuthContext.jsx';
 import Home from './pages/Home.jsx';
@@ -52,7 +52,7 @@ function AppLayout() {
 
   return (
     <div className="app-layout">
-      <FloatingBackground />
+      <Suspense fallback={null}><FloatingBackground /></Suspense>
       {user && user.emailVerified === false && (
         <div className="email-verify-banner">
           <span>
@@ -120,7 +120,7 @@ function PublicLayout() {
 
   return (
     <div className="app-public">
-      <FloatingBackground />
+      <Suspense fallback={null}><FloatingBackground /></Suspense>
       {!isAuthenticated && !bannerDismissed && (
         <div className="announcement-banner" role="banner">
           <span className="announcement-banner__text">

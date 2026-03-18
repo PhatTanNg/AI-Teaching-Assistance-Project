@@ -4,6 +4,10 @@ import { useState, useEffect, useRef, useCallback } from 'react';
  * Mascot — animated walking monkey
  * States: sitting → walking → eating → walking → ...
  * Click to scare it off screen; it returns from the other side.
+ *
+ * Performance: position is updated via DOM ref (not setState) so the
+ * RAF loop runs at 60fps without triggering React re-renders each frame.
+ * Re-renders only happen on state/eatFrame/walkFrame changes (~8fps max).
  */
 
 const WALK_SPEED   = 90;   // px/s
@@ -23,7 +27,6 @@ const S = {
 };
 
 export default function Mascot() {
-  const [x, setX]           = useState(() => window.innerWidth - 120);
   const [facingRight, setFacingRight] = useState(false);
   const [state, setState]   = useState(S.SITTING);
   const [eatFrame, setEatFrame] = useState(0); // 0-2 banana bite frames
@@ -35,6 +38,13 @@ export default function Mascot() {
   const timersRef   = useRef([]);
   const rafRef      = useRef(null);
   const lastTimeRef = useRef(null);
+  const mascotRef   = useRef(null); // DOM ref for direct position updates
+
+  // Update DOM position directly — no setState, no re-render
+  const setDomX = useCallback((x) => {
+    xRef.current = x;
+    if (mascotRef.current) mascotRef.current.style.left = `${x}px`;
+  }, []);
 
   const addTimer = (fn, ms) => {
     const id = setTimeout(fn, ms);
@@ -50,7 +60,7 @@ export default function Mascot() {
 
   useEffect(() => () => clearTimers(), [clearTimers]);
 
-  // Walk loop via requestAnimationFrame
+  // Walk loop via requestAnimationFrame — position updated via DOM ref
   const startWalking = useCallback((toX) => {
     clearTimers();
     setState(S.WALKING);
@@ -68,20 +78,17 @@ export default function Mascot() {
       const dt = lastTimeRef.current ? (now - lastTimeRef.current) / 1000 : 0;
       lastTimeRef.current = now;
 
-      // Move
+      // Move — direct DOM update, no setState
       const next = xRef.current + dir * WALK_SPEED * dt;
       const arrived = dir === 1 ? next >= toX : next <= toX;
-      const clampedX = arrived ? toX : next;
-      xRef.current = clampedX;
-      setX(clampedX);
+      setDomX(arrived ? toX : next);
 
-      // Walk leg frame toggle ~8fps
+      // Walk leg frame toggle ~8fps — setState ok here (low freq)
       legTimer += dt;
       if (legTimer > 0.12) { legTimer = 0; frame = (frame + 1) % 4; setWalkFrame(frame); }
 
       if (arrived) {
         lastTimeRef.current = null;
-        // Decide: eat or turn around
         const roll = Math.random();
         if (roll < 0.6) {
           // Eat!
@@ -108,12 +115,11 @@ export default function Mascot() {
 
     lastTimeRef.current = null;
     rafRef.current = requestAnimationFrame(loop);
-  }, [clearTimers]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [clearTimers, setDomX]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const scheduleNextWalk = useCallback(() => {
     if (stateRef.current === S.FLEEING || stateRef.current === S.HIDDEN || stateRef.current === S.ENTERING) return;
     const W = window.innerWidth;
-    // Pick a random x destination staying away from edges
     const targetX = SCREEN_PAD + Math.random() * (W - SCREEN_PAD * 3);
     addTimer(() => startWalking(targetX), 300);
   }, [startWalking]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -129,7 +135,6 @@ export default function Mascot() {
     stateRef.current = S.FLEEING;
     setState(S.FLEEING);
 
-    // Flee right off screen
     setFacingRight(true);
     dirRef.current = 1;
 
@@ -138,41 +143,37 @@ export default function Mascot() {
     const flee = (now) => {
       const dt = last ? (now - last) / 1000 : 0;
       last = now;
-      const next = xRef.current + FLEE_SPEED * dt;
-      xRef.current = next;
-      setX(next);
-      if (next < W + 100) {
+      // Direct DOM update — no setState
+      setDomX(xRef.current + FLEE_SPEED * dt);
+      if (xRef.current < W + 100) {
         rafRef.current = requestAnimationFrame(flee);
       } else {
-        // Hidden off screen
         stateRef.current = S.HIDDEN;
         setState(S.HIDDEN);
-        // Re-enter from left after 4s
         addTimer(() => {
-          xRef.current = -100;
-          setX(-100);
+          setDomX(-100);
           setFacingRight(true);
           dirRef.current = 1;
           stateRef.current = S.ENTERING;
           setState(S.ENTERING);
-          // Walk in from left
           const entryTarget = 80 + Math.random() * (W / 2);
           startWalking(entryTarget);
         }, 4000);
       }
     };
     rafRef.current = requestAnimationFrame(flee);
-  }, [clearTimers, startWalking]);
+  }, [clearTimers, startWalking, setDomX]);
 
   if (state === S.HIDDEN) return null;
 
-  const bottom = state === S.WALKING ? [0, 3, 0, -3][walkFrame] : 0; // subtle bounce when walking
+  const bottom = state === S.WALKING ? [0, 3, 0, -3][walkFrame] : 0;
 
   return (
     <div
+      ref={mascotRef}
       className="mascot"
       style={{
-        left: x,
+        left: xRef.current,
         right: 'auto',
         bottom: `${20 + bottom}px`,
         transform: `scaleX(${facingRight ? 1 : -1})`,
@@ -196,20 +197,17 @@ function MonkeySVG({ state, walkFrame, eatFrame }) {
   const isWalking = state === S.WALKING || state === S.FLEEING || state === S.ENTERING;
   const isEating  = state === S.EATING;
 
-  // Leg angles for walking cycle
   const legAngles = [
-    [20, -20, -20, 20],   // frame 0: L-fwd, R-back
-    [10, -10, -10, 10],   // frame 1
-    [-20, 20, 20, -20],   // frame 2: L-back, R-fwd
-    [-10, 10, 10, -10],   // frame 3
+    [20, -20, -20, 20],
+    [10, -10, -10, 10],
+    [-20, 20, 20, -20],
+    [-10, 10, 10, -10],
   ];
   const [lf, rf, lb, rb] = isWalking ? legAngles[walkFrame] : [0, 0, 0, 0];
 
-  // Arm angles
   const armL = isWalking ? -lf * 0.6 : isEating ? -40 : 10;
   const armR = isWalking ?  lf * 0.6 : isEating ?  20 : 10;
 
-  // Banana position (when eating, held up to mouth)
   const bananaY = isEating ? 18 + Math.sin(eatFrame * 1.5) * 4 : 30;
   const bananaVisible = isEating || state === S.SITTING;
 
@@ -239,12 +237,10 @@ function MonkeySVG({ state, walkFrame, eatFrame }) {
       />
 
       {/* === BACK LEGS (behind body) === */}
-      {/* Left back leg */}
       <g style={{ transformOrigin: '28px 57px', transform: `rotate(${lb}deg)` }}>
         <rect x="24" y="57" width="8" height="16" rx="4" fill="#A0522D"/>
         <ellipse cx="28" cy="74" rx="6" ry="4" fill="#8B4513"/>
       </g>
-      {/* Right back leg */}
       <g style={{ transformOrigin: '42px 57px', transform: `rotate(${rb}deg)` }}>
         <rect x="38" y="57" width="8" height="16" rx="4" fill="#A0522D"/>
         <ellipse cx="42" cy="74" rx="6" ry="4" fill="#8B4513"/>
@@ -252,13 +248,11 @@ function MonkeySVG({ state, walkFrame, eatFrame }) {
 
       {/* === BODY === */}
       <ellipse cx="35" cy="52" rx="17" ry="15" fill="#C8874A"/>
-      {/* Belly */}
       <ellipse cx="35" cy="55" rx="10" ry="9" fill="#E8B07A"/>
 
       {/* === LEFT ARM === */}
       <g style={{ transformOrigin: '18px 44px', transform: `rotate(${armL}deg)` }}>
         <path d="M18 44 Q10 54 12 62" stroke="#C8874A" strokeWidth="6" strokeLinecap="round" fill="none"/>
-        {/* Left hand */}
         <circle cx="12" cy="62" r="5" fill="#C8874A"/>
       </g>
 
@@ -266,7 +260,6 @@ function MonkeySVG({ state, walkFrame, eatFrame }) {
       <g style={{ transformOrigin: '52px 44px', transform: `rotate(${armR}deg)` }}>
         <path d="M52 44 Q60 52 58 60" stroke="#C8874A" strokeWidth="6" strokeLinecap="round" fill="none"/>
         <circle cx="58" cy="60" r="5" fill="#C8874A"/>
-        {/* Banana in right hand */}
         {bananaVisible && (
           <g transform={`translate(52, ${bananaY}) rotate(-40)`}>
             <path
@@ -276,7 +269,6 @@ function MonkeySVG({ state, walkFrame, eatFrame }) {
               strokeWidth="0.5"
             />
             <path d="M0 0 Q-1 5 0 10" stroke="#C8A800" strokeWidth="0.7" fill="none"/>
-            {/* Bite mark when eating */}
             {isEating && eatFrame > 0 && (
               <ellipse cx="6" cy="5" rx="3" ry="2" fill="#C8874A" opacity="0.6"/>
             )}
@@ -286,18 +278,14 @@ function MonkeySVG({ state, walkFrame, eatFrame }) {
 
       {/* === HEAD === */}
       <circle cx="35" cy="28" r="20" fill="#C8874A"/>
-      {/* Left ear */}
       <circle cx="15" cy="28" r="7" fill="#C8874A"/>
       <circle cx="15" cy="28" r="4" fill="#E8A07A"/>
-      {/* Right ear */}
       <circle cx="55" cy="28" r="7" fill="#C8874A"/>
       <circle cx="55" cy="28" r="4" fill="#E8A07A"/>
-      {/* Face muzzle */}
       <ellipse cx="35" cy="32" rx="13" ry="10" fill="#E8B07A"/>
 
       {/* === EYES === */}
       {state === S.FLEEING ? (
-        /* Scared O_O eyes */
         <>
           <circle cx="28" cy="25" r="5" fill="white"/>
           <circle cx="42" cy="25" r="5" fill="white"/>
@@ -307,13 +295,11 @@ function MonkeySVG({ state, walkFrame, eatFrame }) {
           <circle cx="44" cy="24.5" r="1.2" fill="white"/>
         </>
       ) : isEating ? (
-        /* Happy squint eyes ^^ */
         <>
           <path d="M24 25 Q28 21 32 25" stroke="#2D1B00" strokeWidth="2" fill="none" strokeLinecap="round"/>
           <path d="M38 25 Q42 21 46 25" stroke="#2D1B00" strokeWidth="2" fill="none" strokeLinecap="round"/>
         </>
       ) : (
-        /* Normal eyes */
         <>
           <circle cx="28" cy="25" r="4" fill="#2D1B00"/>
           <circle cx="42" cy="25" r="4" fill="#2D1B00"/>
@@ -331,7 +317,6 @@ function MonkeySVG({ state, walkFrame, eatFrame }) {
       {state === S.FLEEING ? (
         <path d="M29 38 Q35 34 41 38" stroke="#5C2D0A" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
       ) : isEating ? (
-        /* Chewing mouth — open slightly */
         <>
           <path d="M29 37 Q35 42 41 37" stroke="#5C2D0A" strokeWidth="1.5" fill="#5C2D0A" fillOpacity="0.2" strokeLinecap="round"/>
           {eatFrame > 0 && <ellipse cx="35" cy="38" rx="3" ry="2" fill="#5C2D0A" opacity="0.3"/>}
@@ -341,18 +326,15 @@ function MonkeySVG({ state, walkFrame, eatFrame }) {
       )}
 
       {/* === FRONT LEGS (in front of body) === */}
-      {/* Left front leg */}
       <g style={{ transformOrigin: '28px 60px', transform: `rotate(${lf}deg)` }}>
         <rect x="24" y="60" width="8" height="15" rx="4" fill="#B8723A"/>
         <ellipse cx="28" cy="76" rx="6" ry="4" fill="#9A5C2A"/>
       </g>
-      {/* Right front leg */}
       <g style={{ transformOrigin: '42px 60px', transform: `rotate(${rf}deg)` }}>
         <rect x="38" y="60" width="8" height="15" rx="4" fill="#B8723A"/>
         <ellipse cx="42" cy="76" rx="6" ry="4" fill="#9A5C2A"/>
       </g>
 
-      {/* Keyframes injected once */}
       <style>{`
         @keyframes tailIdle {
           0%, 100% { transform: rotate(0deg); }

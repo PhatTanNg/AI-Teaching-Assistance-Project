@@ -266,10 +266,9 @@ export default function MonkeyChat() {
           boxShadow: lectureContext
             ? '0 4px 20px rgba(167,139,250,0.4)'
             : '0 4px 20px rgba(110,231,247,0.4)',
-          transition: 'transform 0.2s, box-shadow 0.2s, background 0.2s',
+          transition: 'transform 0.15s ease, box-shadow 0.15s ease, background 0.2s ease',
         }}
-        onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.08)'; }}
-        onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; }}
+        className="monkey-chat-fab"
       >
         {isOpen ? <ChevronDown size={22} color="#0f1117" /> : '🐒'}
       </button>

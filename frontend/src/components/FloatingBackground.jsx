@@ -58,14 +58,13 @@ function MonkeyFaceSVG({ size }) {
   );
 }
 
-const ROWS = 42;
+const ROWS = 15;
 const DUR = 200;
 
 function getBreakpoint(w) {
-  if (w < 480)  return { cols: 8,  iconSize: 20 };
-  if (w < 640)  return { cols: 12, iconSize: 20 };
-  if (w < 1024) return { cols: 24, iconSize: 22 };
-  return            { cols: 44, iconSize: 24 };
+  if (w < 768)  return { cols: 0,  iconSize: 20 }; // tắt trên mobile/tablet nhỏ
+  if (w < 1024) return { cols: 6,  iconSize: 22 };
+  return            { cols: 10, iconSize: 24 };
 }
 
 function seed(n) {
@@ -118,7 +117,7 @@ export default function FloatingBackground() {
     });
   }, [bp]);
 
-  if (!visible) return null;
+  if (!visible || bp.cols === 0) return null;
 
   return (
     <>

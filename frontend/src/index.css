@@ -89,10 +89,9 @@ body,
 .mindmap-library, .mindmap-detail-panel,
 h1, h2, h3, h4, p, span, a, label {
   transition:
-    background-color 0.65s ease,
-    border-color     0.55s ease,
-    color            0.55s ease,
-    box-shadow       0.55s ease !important;
+    background-color 0.2s ease,
+    border-color     0.15s ease,
+    color            0.15s ease !important;
 }
 
 /* Override: restore fast transitions for interactive states */
@@ -104,13 +103,12 @@ h1, h2, h3, h4, p, span, a, label {
 .mcq-option, .flashcard-rate-btn,
 .pill, .revision-pill, .badge-item {
   transition:
-    background-color 0.65s ease,
-    border-color     0.55s ease,
-    color            0.55s ease,
-    box-shadow       0.55s ease,
-    transform        0.18s ease,
-    filter           0.18s ease,
-    opacity          0.18s ease !important;
+    background-color 0.2s ease,
+    border-color     0.15s ease,
+    color            0.15s ease,
+    transform        0.15s ease,
+    filter           0.15s ease,
+    opacity          0.15s ease !important;
 }
 
 /* ---------- Reset & Base ---------- */
@@ -137,7 +135,7 @@ body::before {
     radial-gradient(ellipse at 60% 45%, rgba(167, 139, 250, 0.04) 0%, transparent 55%);
   pointer-events: none;
   z-index: 0;
-  animation: auroraShift 18s ease-in-out infinite alternate;
+  animation: auroraShift 40s ease-in-out infinite alternate;
 }
 
 @keyframes auroraShift {
@@ -976,6 +974,7 @@ html.light .auth-card {
     radial-gradient(ellipse 38% 38% at 75% 25%, rgba(110, 231, 247, 0.12) 0%, transparent 70%),
     radial-gradient(ellipse 35% 35% at 55% 75%, rgba(167, 139, 250, 0.12) 0%, transparent 70%);
   animation: card-shader 12s ease-in-out infinite alternate;
+  animation-play-state: paused;
   pointer-events: none;
   z-index: 0;
 }
@@ -4381,4 +4380,59 @@ html.light .transcript-card:hover {
   line-height: 1.75;
   font-size: 0.9rem;
   margin: 0;
+}
+
+/* ---------- MonkeyChat FAB ---------- */
+.monkey-chat-fab:hover {
+  transform: scale(1.08);
+}
+
+/* ---------- PageHint ---------- */
+.page-hint {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.9rem;
+  margin-bottom: 1rem;
+  border-radius: 10px;
+  background: rgba(var(--hint-rgb, 110, 231, 247), 0.08);
+  border: 1px solid rgba(var(--hint-rgb, 110, 231, 247), 0.25);
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  animation: fadeIn 0.25s ease;
+}
+
+.page-hint__icon {
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+.page-hint__msg {
+  flex: 1;
+  line-height: 1.4;
+}
+
+.page-hint__close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  opacity: 0.6;
+  flex-shrink: 0;
+  transition: opacity 0.15s ease;
+}
+
+.page-hint__close:hover { opacity: 1; }
+
+/* ---------- Accessibility: prefers-reduced-motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

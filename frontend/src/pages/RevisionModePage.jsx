@@ -6,6 +6,7 @@ import ProgressDashboard from '../components/revision/ProgressDashboard.jsx';
 import GenerationLoader from '../components/revision/GenerationLoader.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useLanguage } from '../context/LanguageContext.jsx';
+import PageHint from '../components/PageHint.jsx';
 
 const apiBase = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5001';
 const tokenKey = 'aita_access_token';
@@ -122,6 +123,13 @@ export default function RevisionModePage() {
         <h1>{t('revision.title')}</h1>
         <p className="card__subtitle">{t('revision.subtitle')}</p>
       </div>
+
+      <PageHint
+        storageKey="aita-hint-revision"
+        icon="🃏"
+        message={t('hints.revision')}
+        color="#4ADE80"
+      />
 
       {error && (
         <div style={{ padding: '1rem', background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.2)', borderRadius: '0.75rem', color: 'var(--accent-red)', marginBottom: '1.5rem' }}>

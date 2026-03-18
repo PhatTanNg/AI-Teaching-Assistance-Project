@@ -1,49 +1,14 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, ChevronRight, Mic, BookOpen, Brain, MessageCircle } from 'lucide-react';
+import { useLanguage } from '../context/LanguageContext';
 
-const STEPS = [
-  {
-    icon: '🐒',
-    emoji: true,
-    title: 'Welcome to AITA!',
-    desc: 'Your AI lecture assistant — turn any lecture into notes, flashcards, and quiz questions in seconds.',
-    cta: 'Start tour',
-    color: '#C8874A',
-    bg: 'rgba(200,135,74,0.12)',
-    border: 'rgba(200,135,74,0.25)',
-  },
-  {
-    Icon: Mic,
-    title: 'Step 1 — Record your lecture',
-    desc: 'Hit the mic button to record live, or upload an audio file. AI will transcribe and summarise it for you.',
-    cta: 'Next',
-    color: '#6EE7F7',
-    bg: 'rgba(110,231,247,0.1)',
-    border: 'rgba(110,231,247,0.25)',
-    path: '/transcribe',
-  },
-  {
-    Icon: BookOpen,
-    title: 'Step 2 — Review & learn keywords',
-    desc: 'Open any transcript to read the full text and summary. AI extracts key terms automatically — no manual notes needed.',
-    cta: 'Next',
-    color: '#A78BFA',
-    bg: 'rgba(167,139,250,0.1)',
-    border: 'rgba(167,139,250,0.25)',
-    path: '/transcripts',
-  },
-  {
-    Icon: Brain,
-    title: 'Step 3 — Revise smarter',
-    desc: 'Use Flashcards or MCQ quizzes to test yourself. Ask Kiki 🐒 anytime you need a deeper explanation.',
-    cta: "Let's go!",
-    color: '#4ADE80',
-    bg: 'rgba(74,222,128,0.1)',
-    border: 'rgba(74,222,128,0.25)',
-    path: '/revision',
-    final: true,
-  },
+const STEP_META = [
+  { icon: '🐒', emoji: true, color: '#C8874A', bg: 'rgba(200,135,74,0.12)', border: 'rgba(200,135,74,0.25)' },
+  { Icon: Mic,            color: '#6EE7F7', bg: 'rgba(110,231,247,0.1)',  border: 'rgba(110,231,247,0.25)', path: '/transcribe' },
+  { Icon: BookOpen,       color: '#A78BFA', bg: 'rgba(167,139,250,0.1)',  border: 'rgba(167,139,250,0.25)', path: '/transcripts' },
+  { Icon: Brain,          color: '#4ADE80', bg: 'rgba(74,222,128,0.1)',   border: 'rgba(74,222,128,0.25)',  path: '/revision' },
+  { Icon: MessageCircle,  color: '#F59E0B', bg: 'rgba(245,158,11,0.1)',   border: 'rgba(245,158,11,0.25)',  path: '/transcribe', final: true },
 ];
 
 const STORAGE_KEY = 'aita-onboarded';
@@ -60,6 +25,15 @@ export function useOnboarding() {
 export default function OnboardingModal({ onDismiss }) {
   const [step, setStep] = useState(0);
   const navigate = useNavigate();
+  const { t } = useLanguage();
+
+  const STEPS = STEP_META.map((meta, i) => ({
+    ...meta,
+    title: t(`onboarding.step${i}Title`),
+    desc:  t(`onboarding.step${i}Desc`),
+    cta:   t(`onboarding.step${i}Cta`),
+  }));
+
   const current = STEPS[step];
   const isLast = step === STEPS.length - 1;
 
@@ -76,7 +50,7 @@ export default function OnboardingModal({ onDismiss }) {
     <div className="onboarding-overlay" role="dialog" aria-modal="true" aria-label="Welcome tour">
       <div className="onboarding-card">
         {/* Close */}
-        <button className="onboarding-close" onClick={onDismiss} aria-label="Skip tour" type="button">
+        <button className="onboarding-close" onClick={onDismiss} aria-label={t('onboarding.skip')} type="button">
           <X size={16} />
         </button>
 
@@ -122,7 +96,7 @@ export default function OnboardingModal({ onDismiss }) {
 
         {step === 0 && (
           <button className="onboarding-skip" onClick={onDismiss} type="button">
-            Skip
+            {t('onboarding.skip')}
           </button>
         )}
       </div>

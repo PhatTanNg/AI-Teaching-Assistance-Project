@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { createTranscript, createKeywords, transcribeFile, correctTranscript, apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
+import PageHint from '../components/PageHint';
 
 // Demo lecture data with keywords
 const DEMO_LECTURE = [
@@ -61,8 +62,6 @@ const Transcribe = () => {
   // Input mode + language
   const [inputMode, setInputMode]       = useState('live'); // 'live' | 'upload'
   const [transcribeLang, setTranscribeLang] = useState('vi');
-  const [autoCorrect, setAutoCorrect]   = useState(true);
-
   // Upload mode
   const [uploadFile, setUploadFile]             = useState(null);
   const [isTranscribingFile, setIsTranscribingFile] = useState(false);
@@ -78,14 +77,12 @@ const Transcribe = () => {
 
   // Refs for use inside async callbacks (avoids stale closures)
   const tokenRef          = useRef(token);
-  const autoCorrectRef    = useRef(autoCorrect);
+  const autoCorrectRef    = useRef(true);
   const correctedTextRef  = useRef('');
   const pendingChunksRef  = useRef([]);
   const chunkIdRef        = useRef(0);
 
   useEffect(() => { tokenRef.current = token; }, [token]);
-  useEffect(() => { autoCorrectRef.current = autoCorrect; }, [autoCorrect]);
-
   const [isRecording, setIsRecording]                 = useState(false);
   const [rawTranscript, setRawTranscript]             = useState('');
   const [editedTranscript, setEditedTranscript]       = useState('');
@@ -480,6 +477,13 @@ const Transcribe = () => {
         <p className="card__subtitle">{t('transcribe.subtitle')}</p>
       </div>
 
+      <PageHint
+        storageKey="aita-hint-transcribe"
+        icon="🎙️"
+        message={t('hints.transcribe')}
+        color="#6EE7F7"
+      />
+
       {saveError && (
         <Alert variant="destructive" style={{ marginBottom: '1rem' }}>
           <AlertDescription>{saveError}</AlertDescription>
@@ -532,17 +536,6 @@ const Transcribe = () => {
             </button>
           </div>
 
-          {/* AutoCorrect toggle (live mode only) */}
-          {inputMode === 'live' && (
-            <>
-              <div className="settings-divider" />
-              <button type="button"
-                className={`btn btn--sm${autoCorrect ? '' : ' btn--ghost'}`}
-                onClick={() => setAutoCorrect(v => !v)} title="Toggle real-time AI correction">
-                <Sparkles size={13} /> {t('transcribe.autoCorrect')}
-              </button>
-            </>
-          )}
         </div>
       </div>
 
@@ -581,7 +574,7 @@ const Transcribe = () => {
                 {isRecording && (
                   <div className="recording-indicator">
                     <span className="recording-dot" />
-                    {autoCorrect ? 'Recording + AI correcting…' : 'Recording…'}
+                    Recording + AI correcting…
                     {isAnalyzing ? ' (extracting keywords…)' : ''}
                   </div>
                 )}

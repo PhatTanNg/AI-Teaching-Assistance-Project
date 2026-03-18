@@ -30,6 +30,7 @@ import TranscriptVisualizer from '../components/TranscriptVisualizer';
 import { printNote } from '../utils/printNote';
 import { useLanguage } from '../context/LanguageContext';
 import { useChatContext } from '../context/ChatContext';
+import PageHint from '../components/PageHint';
 
 const Transcripts = () => {
   const { token } = useAuth();
@@ -120,6 +121,13 @@ const Transcripts = () => {
         <p className="card__subtitle">{t('transcripts.subtitle')}</p>
       </div>
 
+      <PageHint
+        storageKey="aita-hint-transcripts"
+        icon="📋"
+        message={t('hints.transcripts')}
+        color="#A78BFA"
+      />
+
       {error && (
         <Alert variant="destructive" style={{ marginBottom: '1rem' }}>
           <AlertDescription>{error}</AlertDescription>
@@ -194,39 +202,27 @@ const Transcripts = () => {
         <DialogContent className="transcript-dialog">
           {selectedTranscript ? (
             <>
-              <DialogHeader style={{ paddingBottom: '0.75rem', borderBottom: '1px solid var(--glass-border)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 0 }}>
-                    <div style={{
-                      width: 40, height: 40, borderRadius: '0.75rem', flexShrink: 0,
-                      background: 'rgba(245,166,35,0.1)', border: '1px solid rgba(245,166,35,0.2)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      color: 'var(--accent-primary)'
-                    }}>
-                      <BookOpen size={20} />
-                    </div>
-                    <div style={{ minWidth: 0 }}>
-                      <DialogTitle style={{ color: 'var(--text-primary)', fontSize: '1.05rem', lineHeight: 1.3 }}>
-                        {selectedTranscript.subject || 'Transcript'}
-                      </DialogTitle>
-                      <DialogDescription style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginTop: '0.1rem', display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <Calendar size={11} />
-                        {selectedTranscript.transcribedAt
-                          ? new Date(selectedTranscript.transcribedAt).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
-                          : ''}
-                      </DialogDescription>
-                    </div>
+              <DialogHeader style={{ paddingBottom: '0.75rem', borderBottom: '1px solid var(--glass-border)', paddingRight: '2.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <div style={{
+                    width: 40, height: 40, borderRadius: '0.75rem', flexShrink: 0,
+                    background: 'rgba(245,166,35,0.1)', border: '1px solid rgba(245,166,35,0.2)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: 'var(--accent-primary)'
+                  }}>
+                    <BookOpen size={20} />
                   </div>
-                  <Button
-                    size="sm"
-                    className="btn btn--ghost btn--sm"
-                    style={{ flexShrink: 0 }}
-                    onClick={() => printNote(selectedTranscript)}
-                    title={t('transcripts.downloadPdf')}
-                  >
-                    <Download size={14} />
-                    <span className="desktop-only" style={{ marginLeft: '0.3rem' }}>{t('transcripts.downloadPdf')}</span>
-                  </Button>
+                  <div style={{ minWidth: 0 }}>
+                    <DialogTitle style={{ color: 'var(--text-primary)', fontSize: '1.05rem', lineHeight: 1.3 }}>
+                      {selectedTranscript.subject || 'Transcript'}
+                    </DialogTitle>
+                    <DialogDescription style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginTop: '0.1rem', display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <Calendar size={11} />
+                      {selectedTranscript.transcribedAt
+                        ? new Date(selectedTranscript.transcribedAt).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                        : ''}
+                    </DialogDescription>
+                  </div>
                 </div>
               </DialogHeader>
 
@@ -284,6 +280,15 @@ const Transcripts = () => {
                       <Edit2 size={13} /> {t('transcripts.editSummary')}
                     </Button>
                   )}
+                  <Button
+                    size="sm"
+                    className="btn btn--ghost btn--sm"
+                    style={{ flexShrink: 0 }}
+                    onClick={() => printNote(selectedTranscript)}
+                    title={t('transcripts.downloadPdf')}
+                  >
+                    <Download size={14} />
+                  </Button>
                 </div>
 
                 {/* Transcript tab */}
