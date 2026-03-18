@@ -85,8 +85,6 @@ const Transcribe = () => {
   const keywordsRef       = useRef([]);
 
   useEffect(() => { tokenRef.current = token; }, [token]);
-  useEffect(() => { subjectRef.current = subject; }, [subject]);
-  useEffect(() => { keywordsRef.current = keywords; }, [keywords]);
   const [isRecording, setIsRecording]                 = useState(false);
   const [rawTranscript, setRawTranscript]             = useState('');
   const [editedTranscript, setEditedTranscript]       = useState('');
@@ -110,6 +108,9 @@ const Transcribe = () => {
   const [saveError, setSaveError]                   = useState('');
   const [isSummarizing]                             = useState(false);
   const [transcriptionStopped, setTranscriptionStopped] = useState(false);
+
+  useEffect(() => { subjectRef.current = subject; }, [subject]);
+  useEffect(() => { keywordsRef.current = keywords; }, [keywords]);
 
   /* ── Speech recognition setup (re-runs only when language changes) ── */
   useEffect(() => {
