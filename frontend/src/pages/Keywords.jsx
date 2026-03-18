@@ -58,7 +58,7 @@ const Keywords = () => {
 
         if (transcriptObj.sessionId) {
           const kws = await getKeywordsBySession(token, transcriptObj.sessionId);
-          setKeywordGroups([{ _id: transcriptObj.sessionId, transcriptId: selectedTranscript, keywords: kws }]);
+          setKeywordGroups([{ _id: transcriptObj.sessionId, isLegacy: true, transcriptId: selectedTranscript, keywords: kws }]);
         } else {
           const data = await getKeywordGroupsByTranscript(token, selectedTranscript);
           setKeywordGroups(data);
@@ -97,6 +97,7 @@ const Keywords = () => {
   const handleDeleteKeyword = async (keywordGroupId, keywordId) => {
     if (!confirm('Are you sure you want to delete this keyword?')) return;
     if (!token) { setError('Not authenticated'); return; }
+    setError('');
     try {
       await removeKeywordFromGroup(token, keywordGroupId, keywordId);
       setKeywordGroups(prev => prev.map(g => ({ ...g, keywords: g.keywords.filter(kw => kw._id !== keywordId) })));
@@ -109,17 +110,28 @@ const Keywords = () => {
   };
 
   const handleAddKeyword = async () => {
-    if (!newKeywordText.trim() || !newKeywordDef.trim() || !token || keywordGroups.length === 0) {
-      setError('Please fill in both fields and select a transcript');
+    setError('');
+    if (!newKeywordText.trim() || !newKeywordDef.trim()) {
+      setError('Please fill in both keyword text and definition.');
+      return;
+    }
+    if (!token) { setError('Not authenticated'); return; }
+    const realGroup = keywordGroups.find(g => !g.isLegacy);
+    if (!realGroup) {
+      setError(
+        keywordGroups.length === 0
+          ? 'No keyword group found for this transcript. Generate keywords first.'
+          : 'This transcript uses legacy keyword storage — manual add is not supported.'
+      );
       return;
     }
     try {
-      const keywordGroup = keywordGroups[0];
-      const result = await addKeywordToGroup(token, keywordGroup._id, {
+      const result = await addKeywordToGroup(token, realGroup._id, {
         keywordText: newKeywordText.trim(),
         definition: newKeywordDef.trim(),
       });
-      setKeywordGroups([result]);
+      // Backend returns the updated keyword group with populated keywords
+      setKeywordGroups(prev => prev.map(g => g._id === realGroup._id ? result : g));
       setNewKeywordText('');
       setNewKeywordDef('');
       setSuccessMessage('Keyword added successfully');
@@ -130,7 +142,8 @@ const Keywords = () => {
     }
   };
 
-  const allKeywords = keywordGroups.flatMap(g => g.keywords);
+  // Carry groupId on each keyword so the delete handler uses the correct group
+  const allKeywords = keywordGroups.flatMap(g => g.keywords.map(kw => ({ ...kw, groupId: g._id, isLegacy: g.isLegacy })));
   const filteredKeywords = allKeywords.filter(kw =>
     kw.keywordText.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -256,8 +269,8 @@ const Keywords = () => {
                             <Button onClick={() => handleEditDefinition(keyword._id, keyword.definition)} size="sm" className="btn btn--ghost btn--sm">
                               <Edit2 size={14} />
                             </Button>
-                            <Button onClick={() => handleDeleteKeyword(keywordGroups[0]._id, keyword._id)} size="sm"
-                              className="btn btn--ghost btn--sm" style={{ color: 'var(--accent-red)' }}>
+                            <Button onClick={() => handleDeleteKeyword(keyword.groupId, keyword._id)} size="sm"
+                              className="btn btn--ghost btn--sm" style={{ color: 'var(--accent-red)' }} disabled={keyword.isLegacy}>
                               <Trash2 size={14} />
                             </Button>
                           </>

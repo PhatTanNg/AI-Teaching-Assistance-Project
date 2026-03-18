@@ -12,18 +12,30 @@ const AuthForm = ({ mode = 'signin', onSubmit, isSubmitting, error }) => {
     displayName: '',
   });
   const [confirmError, setConfirmError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+
+  const passwordOk = (pw) => pw.length >= 8 && /[0-9!@#$%^&*()_\-+=\[\]{};':"\\|,.<>/?]/.test(pw);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
     setFormValues((prev) => ({ ...prev, [name]: value }));
-    if (name === 'confirmPassword' || name === 'password') setConfirmError('');
+    if (name === 'confirmPassword' || name === 'password') {
+      setConfirmError('');
+      setPasswordError('');
+    }
   };
 
   const handleSubmit = (event) => {
     event.preventDefault();
-    if (isSignUp && formValues.password !== formValues.confirmPassword) {
-      setConfirmError('Passwords do not match.');
-      return;
+    if (isSignUp) {
+      if (!passwordOk(formValues.password)) {
+        setPasswordError('Password must be at least 8 characters and contain a number or special character.');
+        return;
+      }
+      if (formValues.password !== formValues.confirmPassword) {
+        setConfirmError('Passwords do not match.');
+        return;
+      }
     }
     onSubmit(formValues);
   };
@@ -88,6 +100,11 @@ const AuthForm = ({ mode = 'signin', onSubmit, isSubmitting, error }) => {
         placeholder="Your secure password" value={formValues.password}
         onChange={handleChange} required className="form-input"
         autoComplete={isSignUp ? 'new-password' : 'current-password'} />
+      {isSignUp && (
+        <p style={{ fontSize: '0.75rem', color: passwordError ? 'var(--accent-red)' : 'var(--text-muted)', marginTop: '0.25rem', marginBottom: '0.25rem' }}>
+          {passwordError || 'Min 8 characters, must include a number or special character (!@#$%…)'}
+        </p>
+      )}
 
       {isSignUp && (
         <>

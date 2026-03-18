@@ -83,6 +83,8 @@ const Transcribe = () => {
   const chunkIdRef        = useRef(0);
   const subjectRef        = useRef('');
   const keywordsRef       = useRef([]);
+  const subjectInputRef   = useRef(null);
+  const transcriptAreaRef = useRef(null);
 
   useEffect(() => { tokenRef.current = token; }, [token]);
   const [isRecording, setIsRecording]                 = useState(false);
@@ -100,6 +102,7 @@ const Transcribe = () => {
   const demoIntervalRef   = useRef(null);
   const analysisTimerRef  = useRef(null);
   const isRecordingRef    = useRef(false);
+  const isAnalyzingRef    = useRef(false);
   useEffect(() => { isRecordingRef.current = isRecording; }, [isRecording]);
   const [isRealtimeStreaming] = useState(false);
 
@@ -229,6 +232,7 @@ const Transcribe = () => {
   const analyzeTranscript = useCallback(async (text) => {
     if (!text || text.length < 20) return;
     setIsAnalyzing(true);
+    isAnalyzingRef.current = true;
     const cleaned = text.replace(/\|/g, '').trim();
     try {
       const data = await apiClient('/api/transcribe/analyze', {
@@ -257,6 +261,7 @@ const Transcribe = () => {
       console.error('[KEYWORD] Error analyzing:', e);
     } finally {
       setIsAnalyzing(false);
+      isAnalyzingRef.current = false;
     }
   }, [transcribeLang, token]);
 
@@ -264,6 +269,7 @@ const Transcribe = () => {
     if (!isRecording && !demoMode) return;
     if (!rawTranscript || rawTranscript.length < 20) return;
     if (rawTranscript.length - lastAnalyzedLength < 30) return;
+    if (isAnalyzingRef.current) return; // skip if analysis already in-flight
     if (analysisTimerRef.current) clearTimeout(analysisTimerRef.current);
     analysisTimerRef.current = setTimeout(() => analyzeTranscript(rawTranscript), 500);
     return () => { if (analysisTimerRef.current) clearTimeout(analysisTimerRef.current); };
@@ -373,9 +379,24 @@ const Transcribe = () => {
     if (sel) setSelectedText(sel);
   };
 
+  const handleTextareaSelect = (e) => {
+    const { selectionStart, selectionEnd } = e.target;
+    if (selectionStart !== selectionEnd) {
+      const sel = editedTranscript.substring(selectionStart, selectionEnd).trim();
+      if (sel) setSelectedText(sel);
+    }
+  };
+
   const handleTextareaDoubleClick = (e) => {
+    // Use the browser's auto-selection on double-click first (may be multi-word if user had selected)
+    const { selectionStart, selectionEnd } = e.target;
+    if (selectionStart !== selectionEnd) {
+      const sel = editedTranscript.substring(selectionStart, selectionEnd).trim();
+      if (sel) { setSelectedText(sel); return; }
+    }
+    // Fallback: extract word under cursor
     const text = editedTranscript;
-    const pos  = e.target.selectionStart;
+    const pos  = selectionStart;
     let start  = pos, end = pos;
     while (start > 0 && /\w/.test(text[start - 1])) start--;
     while (end < text.length && /\w/.test(text[end])) end++;
@@ -420,7 +441,18 @@ const Transcribe = () => {
   /* ── Save transcript ── */
   const saveTranscript = async () => {
     setSaveError('');
-    if (!subject.trim() || !editedTranscript.trim()) { setSaveError('Please enter a subject and provide a transcript'); return; }
+    if (!subject.trim()) {
+      setSaveError('Please enter a subject name before saving.');
+      subjectInputRef.current?.focus();
+      subjectInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    if (!editedTranscript.trim()) {
+      setSaveError('Please provide a transcript before saving.');
+      transcriptAreaRef.current?.focus();
+      transcriptAreaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
     if (!token) { setSaveError('Not authenticated. Please log in again.'); setTimeout(() => navigate('/signin'), 2000); return; }
     try {
       setIsSaving(true);
@@ -528,7 +560,7 @@ const Transcribe = () => {
       <div className="card" style={{ marginBottom: '1rem' }}>
         <div>
           <Label className="form-label">{t('transcribe.subjectLabel')} *</Label>
-          <Input placeholder={t('transcribe.subjectPlaceholder')} value={subject}
+          <Input ref={subjectInputRef} placeholder={t('transcribe.subjectPlaceholder')} value={subject}
             onChange={(e) => setSubject(e.target.value)}
             disabled={isRecording || isRealtimeStreaming || isTranscribingFile}
             className="form-input" style={{ maxWidth: '480px' }} />
@@ -614,8 +646,9 @@ const Transcribe = () => {
                 )}
 
                 {/* Transcript area */}
-                {!transcriptionStopped ? (
-                  <div className={`transcript-display${isRecording ? ' transcript-display--recording' : ''}`} onMouseUp={handleTextSelection}>
+                {isRecording ? (
+                  /* During recording: live display with corrected + pending + interim */
+                  <div className="transcript-display transcript-display--recording" onMouseUp={handleTextSelection}>
                     {correctedText || pendingChunks.length > 0 || interimText ? (
                       <>
                         <span>{correctedText}</span>
@@ -630,22 +663,25 @@ const Transcribe = () => {
                       </>
                     ) : (
                       <span style={{ color: 'var(--text-muted)' }}>
-                        Your transcription will appear here.
+                        Recording… speak now.
                         <br /><br />
                         <small>Keywords are extracted automatically as you speak.</small>
                       </span>
                     )}
                   </div>
                 ) : (
+                  /* Before recording OR after stopping: always-visible editable textarea */
                   <div>
                     <Label className="form-label">{t('transcribe.transcriptLabel')}</Label>
                     <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
-                      💡 {t('transcribe.editHint')}
+                      {transcriptionStopped
+                        ? `💡 ${t('transcribe.editHint')}`
+                        : '💡 Type or paste your transcript here, or press Record to start.'}
                     </p>
-                    <textarea value={editedTranscript} onChange={(e) => setEditedTranscript(e.target.value)}
-                      onDoubleClick={handleTextareaDoubleClick}
+                    <textarea ref={transcriptAreaRef} value={editedTranscript} onChange={(e) => setEditedTranscript(e.target.value)}
+                      onDoubleClick={handleTextareaDoubleClick} onMouseUp={handleTextareaSelect}
                       className="neon-textarea" style={{ minHeight: '300px', lineHeight: 1.8 }}
-                      placeholder="Your transcript will appear here. You can edit it before saving." />
+                      placeholder="Type or paste a transcript here, or use the Record button above." />
                     {editedTranscript && keywords.length > 0 && (
                       <div className="transcript-preview" style={{ marginTop: '1rem' }}>
                         <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem', fontWeight: 600 }}>
@@ -719,8 +755,8 @@ const Transcribe = () => {
                     <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
                       💡 {t('transcribe.editHint')}
                     </p>
-                    <textarea value={editedTranscript} onChange={(e) => setEditedTranscript(e.target.value)}
-                      onDoubleClick={handleTextareaDoubleClick}
+                    <textarea ref={transcriptAreaRef} value={editedTranscript} onChange={(e) => setEditedTranscript(e.target.value)}
+                      onDoubleClick={handleTextareaDoubleClick} onMouseUp={handleTextareaSelect}
                       className="neon-textarea" style={{ minHeight: '300px', lineHeight: 1.8 }}
                       placeholder="Transcription result will appear here." />
                     {editedTranscript && keywords.length > 0 && (
@@ -745,6 +781,14 @@ const Transcribe = () => {
                 <Button onClick={addKeyword} size="sm" className="btn btn--sm">
                   <Highlighter size={14} /> Add Keyword
                 </Button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedText('')}
+                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '0.25rem', flexShrink: 0, display: 'flex', alignItems: 'center' }}
+                  title="Clear selection"
+                >
+                  <X size={14} />
+                </button>
               </div>
             )}
 
@@ -800,7 +844,7 @@ const Transcribe = () => {
 
             {/* ── Save / Clear ── */}
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-              <Button onClick={saveTranscript} disabled={!editedTranscript || isSaving || !subject} className="btn">
+              <Button onClick={saveTranscript} disabled={isSaving} className="btn">
                 <Save size={16} /> {isSaving ? t('transcribe.saving') : t('transcribe.saveBtn')}
               </Button>
               <Button onClick={clearTranscript} disabled={!rawTranscript && !editedTranscript && !uploadFile} className="btn btn--ghost">

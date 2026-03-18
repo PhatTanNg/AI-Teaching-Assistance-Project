@@ -1,7 +1,17 @@
+import { useNavigate } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react';
+
 const Terms = () => {
+  const navigate = useNavigate();
   return (
     <div className="legal-page">
       <div className="legal-page__header">
+        <button
+          onClick={() => navigate(-1)}
+          style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '0.75rem', padding: 0 }}
+        >
+          <ArrowLeft size={16} /> Back
+        </button>
         <h1 className="legal-page__title">Terms of Service</h1>
         <span className="legal-page__meta">Last updated: March 2026</span>
       </div>

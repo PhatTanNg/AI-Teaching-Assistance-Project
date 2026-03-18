@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext.jsx';
 
 export default function FlashcardReview({ cards, onRate, isLoading }) {
@@ -25,6 +26,12 @@ export default function FlashcardReview({ cards, onRate, isLoading }) {
     if (activeIndex < total - 1) setActiveIndex(prev => prev + 1);
   };
 
+  const goTo = (idx) => {
+    setActiveIndex(idx);
+    setIsFlipped(false);
+    setNextReviewDate('');
+  };
+
   if (!currentCard) {
     return (
       <section className="card revision-card">
@@ -36,15 +43,27 @@ export default function FlashcardReview({ cards, onRate, isLoading }) {
 
   return (
     <section className="card revision-card">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+      <div style={{ marginBottom: '1rem' }}>
         <h2 className="revision-card__title">{t('revision.flashcardTitle')}</h2>
-        <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-          {t('revision.cardLabel')} {activeIndex + 1} / {total}
-        </span>
       </div>
 
       <div className="flashcard-progress">
         <div className="flashcard-progress__fill" style={{ width: `${((activeIndex + 1) / total) * 100}%` }} />
+      </div>
+
+      {/* Prev / Next navigation */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+        <button type="button" onClick={() => goTo(activeIndex - 1)} disabled={activeIndex === 0}
+          className="btn btn--ghost btn--sm" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+          <ChevronLeft size={16} /> Prev
+        </button>
+        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+          {t('revision.cardLabel')} {activeIndex + 1} / {total}
+        </span>
+        <button type="button" onClick={() => goTo(activeIndex + 1)} disabled={activeIndex === total - 1}
+          className="btn btn--ghost btn--sm" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+          Next <ChevronRight size={16} />
+        </button>
       </div>
 
       {/* 3D Flip Card */}

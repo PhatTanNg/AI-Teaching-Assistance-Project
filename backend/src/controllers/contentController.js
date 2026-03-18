@@ -122,7 +122,7 @@ export const createTranscript = async (req, res) => {
                     },
                     { role: 'user', content: `Transcript:\n${text.substring(0, 4000)}` }
                   ],
-                  temperature: 0.2,
+                  temperature: 0,
                   max_tokens: 600,
                 }),
               });
@@ -441,7 +441,7 @@ export const createKeywords = async (req, res) => {
           body: JSON.stringify({
             model: 'gpt-3.5-turbo',
             messages: [systemMsg, userMsg],
-            temperature: 0.2,
+            temperature: 0,
             max_tokens: 500,
           }),
         });

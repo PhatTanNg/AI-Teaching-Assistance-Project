@@ -46,8 +46,12 @@ export const apiClient = async (endpoint, { method = 'GET', data, token, _retry 
         const newToken = await silentRefresh();
         return apiClient(endpoint, { method, data, token: newToken, _retry: true });
       } catch (_refreshErr) {
-        // Refresh failed — clear stored token and surface the 401
+        // Refresh failed — clear stored token, notify app, and surface the 401
         try { localStorage.removeItem(AUTH_TOKEN_KEY); } catch (e) { /* ignore */ }
+        if (typeof window !== 'undefined') {
+          try { sessionStorage.setItem('session_expired', '1'); } catch (e) { /* ignore */ }
+          window.dispatchEvent(new CustomEvent('session-expired'));
+        }
         console.warn('[API] Session expired — please sign in again');
       }
     }

@@ -38,13 +38,19 @@ function AppLayout() {
     if (!user?.email || resendingVerify) return;
     setResendingVerify(true);
     try {
-      await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001'}/api/auth/resend-verification`, {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001'}/api/auth/resend-verification`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: user.email }),
       });
-      setVerifySent(true);
-      setTimeout(() => setVerifySent(false), 5000);
+      if (res.ok) {
+        setVerifySent(true);
+        setTimeout(() => setVerifySent(false), 5000);
+      } else {
+        console.error('[ResendVerify] Server error — check backend SMTP configuration');
+      }
+    } catch (err) {
+      console.error('[ResendVerify] Network error:', err);
     } finally {
       setResendingVerify(false);
     }

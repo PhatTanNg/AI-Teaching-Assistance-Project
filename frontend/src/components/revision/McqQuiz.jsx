@@ -48,6 +48,7 @@ export default function McqQuiz({ questions, onSubmitBatch, isLoading }) {
   const [feedback, setFeedback] = useState(null);
   const [correctCount, setCorrectCount] = useState(0);
   const [done, setDone] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const currentQuestion = useMemo(
     () => (questions?.length > 0 ? questions[index] : null),
@@ -122,13 +123,18 @@ export default function McqQuiz({ questions, onSubmitBatch, isLoading }) {
   const isLastQuestion = index === questions.length - 1;
 
   const submitAnswer = async () => {
-    if (!selected) return;
-    const payload = await onSubmitBatch([
-      { question_id: currentQuestion.id || currentQuestion._id, selected, time_taken_ms: 0 },
-    ]);
-    const result = payload?.submitted?.[0];
-    setFeedback(result || null);
-    if (result?.is_correct) setCorrectCount(prev => prev + 1);
+    if (!selected || submitting) return;
+    setSubmitting(true);
+    try {
+      const payload = await onSubmitBatch([
+        { question_id: currentQuestion.id || currentQuestion._id, selected, time_taken_ms: 0 },
+      ]);
+      const result = payload?.submitted?.[0];
+      setFeedback(result || null);
+      if (result?.is_correct) setCorrectCount(prev => prev + 1);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const nextQuestion = () => {
@@ -199,7 +205,7 @@ export default function McqQuiz({ questions, onSubmitBatch, isLoading }) {
 
       <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
         {!feedback ? (
-          <button type="button" className="btn" onClick={submitAnswer} disabled={!selected || isLoading}>
+          <button type="button" className="btn" onClick={submitAnswer} disabled={!selected || submitting || isLoading}>
             {t('revision.submitAnswer')}
           </button>
         ) : (

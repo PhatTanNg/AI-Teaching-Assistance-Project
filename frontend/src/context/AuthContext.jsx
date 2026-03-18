@@ -83,6 +83,16 @@ export const AuthProvider = ({ children }) => {
     fetchProfile();
   }, [fetchProfile]);
 
+  // Listen for session-expired events dispatched by the API client when refresh fails
+  useEffect(() => {
+    const handleSessionExpired = () => {
+      setToken(null);
+      setUser(null);
+    };
+    window.addEventListener('session-expired', handleSessionExpired);
+    return () => window.removeEventListener('session-expired', handleSessionExpired);
+  }, []);
+
   const login = useCallback(({ accessToken }) => {
     setToken(accessToken);
     try {
