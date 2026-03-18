@@ -58,7 +58,7 @@ const Transcripts = () => {
         setTranscripts(data);
       } catch (err) {
         console.error('Error loading transcripts:', err);
-        setError('Failed to load transcripts');
+        setError(t('transcripts.loadFailed'));
       } finally {
         setLoading(false);
       }
@@ -77,7 +77,7 @@ const Transcripts = () => {
   };
 
   const viewTranscript = useCallback((tr) => {
-    if (!tr?._id) { setError('Invalid transcript'); return; }
+    if (!tr?._id) { setError(t('transcripts.invalidTranscript')); return; }
     setSelectedTranscript(tr);
     setIsDialogOpen(true);
     setLectureContext({ transcript: tr.rawTranscript, summary: tr.summary, topic: tr.subject });
@@ -87,7 +87,7 @@ const Transcripts = () => {
   const cancelEdit = () => { setEditingField(null); setEditingText(''); };
 
   const handleSaveEdit = async () => {
-    if (!editingText.trim()) { setError('Text cannot be empty'); return; }
+    if (!editingText.trim()) { setError(t('common.textEmpty')); return; }
     if (!selectedTranscript || !token) return;
     try {
       setIsSaving(true);
@@ -99,7 +99,7 @@ const Transcripts = () => {
       setTranscripts((prev) => prev.map((tr) => (tr._id === updated._id ? updated : tr)));
       cancelEdit();
     } catch {
-      setError('Failed to update transcript');
+      setError(t('transcripts.updateFailed'));
     } finally {
       setIsSaving(false);
     }
@@ -163,7 +163,7 @@ const Transcripts = () => {
                 <button
                   onClick={() => handleDelete(tr._id, idx)}
                   style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '0.25rem' }}
-                  title="Delete transcript"
+                  title={t('transcripts.deleteTitle')}
                 >
                   <Trash2 size={16} />
                 </button>

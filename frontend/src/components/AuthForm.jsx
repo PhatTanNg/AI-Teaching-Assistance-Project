@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useLanguage } from '../context/LanguageContext.jsx';
 
 const AuthForm = ({ mode = 'signin', onSubmit, isSubmitting, error }) => {
+  const { t } = useLanguage();
   const isSignUp = mode === 'signup';
   const [formValues, setFormValues] = useState({
     usernameOrEmail: '',
@@ -29,11 +31,11 @@ const AuthForm = ({ mode = 'signin', onSubmit, isSubmitting, error }) => {
     event.preventDefault();
     if (isSignUp) {
       if (!passwordOk(formValues.password)) {
-        setPasswordError('Password must be at least 8 characters and contain a number or special character.');
+        setPasswordError(t('auth.passwordRequirements'));
         return;
       }
       if (formValues.password !== formValues.confirmPassword) {
-        setConfirmError('Passwords do not match.');
+        setConfirmError(t('auth.confirmPasswordMismatch'));
         return;
       }
     }
@@ -62,55 +64,53 @@ const AuthForm = ({ mode = 'signin', onSubmit, isSubmitting, error }) => {
         <span className="auth-brand-mark__name">AITA</span>
       </div>
 
-      <h2>{isSignUp ? 'Create an account' : 'Welcome back'}</h2>
+      <h2>{isSignUp ? t('auth.createAccount') : t('auth.welcome')}</h2>
       <p className="card__subtitle">
-        {isSignUp
-          ? 'Sign up to manage your study tools and track progress.'
-          : 'Sign in to continue where you left off.'}
+        {isSignUp ? t('auth.signUpDesc') : t('auth.signInDesc')}
       </p>
 
       {isSignUp ? (
         <>
-          <label className="form-label" htmlFor="displayName">Display name</label>
+          <label className="form-label" htmlFor="displayName">{t('auth.displayName')}</label>
           <input id="displayName" name="displayName" type="text"
-            placeholder="Jackson Nguyen" value={formValues.displayName}
+            placeholder={t('auth.displayNamePH')} value={formValues.displayName}
             onChange={handleChange} required className="form-input" />
 
-          <label className="form-label" htmlFor="username">Username</label>
+          <label className="form-label" htmlFor="username">{t('auth.username')}</label>
           <input id="username" name="username" type="text"
-            placeholder="jacksonn" value={formValues.username}
+            placeholder={t('auth.usernamePH')} value={formValues.username}
             onChange={handleChange} required className="form-input" autoComplete="username" />
 
-          <label className="form-label" htmlFor="email">Email</label>
+          <label className="form-label" htmlFor="email">{t('auth.email')}</label>
           <input id="email" name="email" type="email"
-            placeholder="you@example.com" value={formValues.email}
+            placeholder={t('auth.emailPH')} value={formValues.email}
             onChange={handleChange} required className="form-input" autoComplete="email" />
         </>
       ) : (
         <>
-          <label className="form-label" htmlFor="usernameOrEmail">Username or email</label>
+          <label className="form-label" htmlFor="usernameOrEmail">{t('auth.usernameOrEmail')}</label>
           <input id="usernameOrEmail" name="usernameOrEmail" type="text"
-            placeholder="jacksonn or you@example.com" value={formValues.usernameOrEmail}
+            placeholder={t('auth.usernameOrEmailPH')} value={formValues.usernameOrEmail}
             onChange={handleChange} required className="form-input" autoComplete="username" />
         </>
       )}
 
-      <label className="form-label" htmlFor="password">Password</label>
+      <label className="form-label" htmlFor="password">{t('auth.password')}</label>
       <input id="password" name="password" type="password"
-        placeholder="Your secure password" value={formValues.password}
+        placeholder={t('auth.passwordPH')} value={formValues.password}
         onChange={handleChange} required className="form-input"
         autoComplete={isSignUp ? 'new-password' : 'current-password'} />
       {isSignUp && (
         <p style={{ fontSize: '0.75rem', color: passwordError ? 'var(--accent-red)' : 'var(--text-muted)', marginTop: '0.25rem', marginBottom: '0.25rem' }}>
-          {passwordError || 'Min 8 characters, must include a number or special character (!@#$%…)'}
+          {passwordError || t('auth.passwordHint')}
         </p>
       )}
 
       {isSignUp && (
         <>
-          <label className="form-label" htmlFor="confirmPassword">Confirm password</label>
+          <label className="form-label" htmlFor="confirmPassword">{t('auth.confirmPassword')}</label>
           <input id="confirmPassword" name="confirmPassword" type="password"
-            placeholder="Re-enter your password" value={formValues.confirmPassword}
+            placeholder={t('auth.confirmPasswordPH')} value={formValues.confirmPassword}
             onChange={handleChange} required className="form-input"
             autoComplete="new-password" />
           {confirmError && <p className="form-error" role="alert">{confirmError}</p>}
@@ -121,10 +121,10 @@ const AuthForm = ({ mode = 'signin', onSubmit, isSubmitting, error }) => {
         <label style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start', cursor: 'pointer', marginTop: '0.25rem' }}>
           <input type="checkbox" required style={{ marginTop: '3px', accentColor: 'var(--accent-primary)', flexShrink: 0 }} />
           <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-            I agree to the{' '}
-            <Link to="/terms" style={{ color: 'var(--text-secondary)' }}>Terms of Service</Link>
-            {' '}and{' '}
-            <Link to="/privacy" style={{ color: 'var(--text-secondary)' }}>Privacy Policy</Link>
+            {t('auth.agreePrefix')}{' '}
+            <Link to="/terms" style={{ color: 'var(--text-secondary)' }}>{t('auth.termsLink')}</Link>
+            {' '}{t('auth.and')}{' '}
+            <Link to="/privacy" style={{ color: 'var(--text-secondary)' }}>{t('auth.privacyLink')}</Link>
           </span>
         </label>
       )}
@@ -132,7 +132,7 @@ const AuthForm = ({ mode = 'signin', onSubmit, isSubmitting, error }) => {
       {error && <p className="form-error" role="alert">{error}</p>}
 
       <button className="btn btn--full" disabled={isSubmitting} type="submit">
-        {isSubmitting ? 'Processing…' : isSignUp ? 'Sign up' : 'Sign in'}
+        {isSubmitting ? t('auth.processing') : isSignUp ? t('auth.signUp') : t('auth.signIn')}
       </button>
     </form>
     </div>

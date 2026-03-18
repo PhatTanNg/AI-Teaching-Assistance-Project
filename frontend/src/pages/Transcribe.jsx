@@ -442,18 +442,18 @@ const Transcribe = () => {
   const saveTranscript = async () => {
     setSaveError('');
     if (!subject.trim()) {
-      setSaveError('Please enter a subject name before saving.');
+      setSaveError(t('transcribe.enterSubject'));
       subjectInputRef.current?.focus();
       subjectInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
     if (!editedTranscript.trim()) {
-      setSaveError('Please provide a transcript before saving.');
+      setSaveError(t('transcribe.enterTranscript'));
       transcriptAreaRef.current?.focus();
       transcriptAreaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
-    if (!token) { setSaveError('Not authenticated. Please log in again.'); setTimeout(() => navigate('/signin'), 2000); return; }
+    if (!token) { setSaveError(t('auth.notAuthenticated')); setTimeout(() => navigate('/signin'), 2000); return; }
     try {
       setIsSaving(true);
       const transcriptData = await createTranscript(token, { subject: subject.trim(), rawTranscript: editedTranscript.trim(), lang });
@@ -487,7 +487,7 @@ const Transcribe = () => {
   };
 
   const clearTranscript = () => {
-    if (!confirm('Clear this transcript?')) return;
+    if (!confirm(t('transcribe.clearConfirm'))) return;
     setRawTranscript(''); setEditedTranscript(''); setKeywords([]); setSubject('');
     setLastAnalyzedLength(0); setHoveredKeyword(null); setIsAnalyzing(false); setTranscriptionStopped(false);
     correctedTextRef.current = '';
@@ -632,16 +632,16 @@ const Transcribe = () => {
                   )}
                   <Button onClick={() => analyzeTranscript(rawTranscript)}
                     disabled={isAnalyzing || rawTranscript.length < 50}
-                    className="btn btn--ghost" title="Trigger AI keyword analysis">
-                    <RefreshCw size={16} /> {isAnalyzing ? t('transcribe.analyzing') : 'Analyze'}
+                    className="btn btn--ghost" title={t('transcribe.analyzeTitle')}>
+                    <RefreshCw size={16} /> {isAnalyzing ? t('transcribe.analyzing') : t('transcribe.analyzeBtn')}
                   </Button>
                 </div>
 
                 {isRecording && (
                   <div className="recording-indicator">
                     <span className="recording-dot" />
-                    Recording + AI correcting…
-                    {isAnalyzing ? ' (extracting keywords…)' : ''}
+                    {t('transcribe.recordingIndicator')}
+                    {isAnalyzing ? ` ${t('transcribe.extractingKeywords')}` : ''}
                   </div>
                 )}
 
@@ -663,9 +663,9 @@ const Transcribe = () => {
                       </>
                     ) : (
                       <span style={{ color: 'var(--text-muted)' }}>
-                        Recording… speak now.
+                        {t('transcribe.recordingPrompt')}
                         <br /><br />
-                        <small>Keywords are extracted automatically as you speak.</small>
+                        <small>{t('transcribe.autoExtractHint')}</small>
                       </span>
                     )}
                   </div>
@@ -676,12 +676,12 @@ const Transcribe = () => {
                     <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
                       {transcriptionStopped
                         ? `💡 ${t('transcribe.editHint')}`
-                        : '💡 Type or paste your transcript here, or press Record to start.'}
+                        : t('transcribe.typePasteHint')}
                     </p>
                     <textarea ref={transcriptAreaRef} value={editedTranscript} onChange={(e) => setEditedTranscript(e.target.value)}
                       onDoubleClick={handleTextareaDoubleClick} onMouseUp={handleTextareaSelect}
                       className="neon-textarea" style={{ minHeight: '300px', lineHeight: 1.8 }}
-                      placeholder="Type or paste a transcript here, or use the Record button above." />
+                      placeholder={t('transcribe.textareaPH')} />
                     {editedTranscript && keywords.length > 0 && (
                       <div className="transcript-preview" style={{ marginTop: '1rem' }}>
                         <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem', fontWeight: 600 }}>
@@ -721,7 +721,7 @@ const Transcribe = () => {
                       <button type="button"
                         style={{ marginTop: '0.75rem', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.25rem', margin: '0.75rem auto 0' }}
                         onClick={(e) => { e.stopPropagation(); setUploadFile(null); }}>
-                        <X size={12} /> Remove
+                        <X size={12} /> {t('common.remove')}
                       </button>
                     </div>
                   ) : (
@@ -758,7 +758,7 @@ const Transcribe = () => {
                     <textarea ref={transcriptAreaRef} value={editedTranscript} onChange={(e) => setEditedTranscript(e.target.value)}
                       onDoubleClick={handleTextareaDoubleClick} onMouseUp={handleTextareaSelect}
                       className="neon-textarea" style={{ minHeight: '300px', lineHeight: 1.8 }}
-                      placeholder="Transcription result will appear here." />
+                      placeholder={t('transcribe.resultPlaceholder')} />
                     {editedTranscript && keywords.length > 0 && (
                       <div className="transcript-preview" style={{ marginTop: '1rem' }}>
                         <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem', fontWeight: 600 }}>
@@ -779,13 +779,13 @@ const Transcribe = () => {
                   Selected: <strong style={{ color: 'var(--accent-primary)' }}>{selectedText}</strong>
                 </span>
                 <Button onClick={addKeyword} size="sm" className="btn btn--sm">
-                  <Highlighter size={14} /> Add Keyword
+                  <Highlighter size={14} /> {t('transcribe.addKeywordBtn')}
                 </Button>
                 <button
                   type="button"
                   onClick={() => setSelectedText('')}
                   style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '0.25rem', flexShrink: 0, display: 'flex', alignItems: 'center' }}
-                  title="Clear selection"
+                  title={t('transcribe.clearSelectionTitle')}
                 >
                   <X size={14} />
                 </button>
@@ -862,7 +862,7 @@ const Transcribe = () => {
                 padding: '1rem', background: 'rgba(245,166,35,0.06)',
                 border: '1px solid rgba(245,166,35,0.15)',
                 borderRadius: '0.75rem', fontSize: '0.875rem', color: 'var(--accent-primary)' }}>
-                ⏳ Summary is generated automatically after save.
+                ⏳ {t('transcribe.summaryNote')}
               </div>
             )}
           </div>
@@ -879,7 +879,7 @@ const Transcribe = () => {
 
           {keywords.length === 0 ? (
             <div style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
-              AI-extracted and manual keywords will appear here with definitions.
+              {t('transcribe.keywordsPlaceholder')}
             </div>
           ) : (
             <div style={{ display: 'grid', gap: '0.5rem', maxHeight: '600px', overflowY: 'auto' }}>

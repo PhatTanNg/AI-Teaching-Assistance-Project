@@ -84,7 +84,7 @@ const Keywords = () => {
   };
 
   const handleSaveDefinition = async (keywordId) => {
-    if (!token || !editingDefinition.trim()) { setError('Definition cannot be empty'); return; }
+    if (!token || !editingDefinition.trim()) { setError(t('keywords.definitionEmpty')); return; }
     try {
       await updateKeywordDefinition(token, keywordId, { definition: editingDefinition.trim() });
       setKeywordGroups(prev => prev.map(g => ({
@@ -97,13 +97,13 @@ const Keywords = () => {
       setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
       console.error('Error updating definition:', err);
-      setError(err?.payload?.error || 'Failed to update definition');
+      setError(err?.payload?.error || t('keywords.updateFailed'));
     }
   };
 
   const handleDeleteKeyword = async (keywordGroupId, keywordId) => {
-    if (!confirm('Are you sure you want to delete this keyword?')) return;
-    if (!token) { setError('Not authenticated'); return; }
+    if (!confirm(t('keywords.deleteConfirm'))) return;
+    if (!token) { setError(t('auth.notAuthenticated')); return; }
     setError('');
     try {
       await removeKeywordFromGroup(token, keywordGroupId, keywordId);
@@ -112,17 +112,17 @@ const Keywords = () => {
       setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
       console.error('Error deleting keyword:', err);
-      setError(err?.payload?.error || 'Failed to delete keyword');
+      setError(err?.payload?.error || t('keywords.deleteFailed'));
     }
   };
 
   const handleAddKeyword = async () => {
     setError('');
     if (!newKeywordText.trim() || !newKeywordDef.trim()) {
-      setError('Please fill in both keyword text and definition.');
+      setError(t('keywords.fillBoth'));
       return;
     }
-    if (!token) { setError('Not authenticated'); return; }
+    if (!token) { setError(t('auth.notAuthenticated')); return; }
     try {
       let targetGroup = keywordGroups.find(g => !g.isLegacy);
       if (!targetGroup) {
@@ -216,13 +216,13 @@ const Keywords = () => {
             <h3 style={{ marginBottom: '1rem', fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-primary)' }}>{t('keywords.addKeyword')}</h3>
             <div style={{ display: 'grid', gap: '1rem' }}>
               <div>
-                <Label className="form-label">Keyword Text</Label>
-                <Input placeholder="Enter keyword" value={newKeywordText} onChange={(e) => setNewKeywordText(e.target.value)}
+                <Label className="form-label">{t('keywords.textLabel')}</Label>
+                <Input placeholder={t('keywords.textPH')} value={newKeywordText} onChange={(e) => setNewKeywordText(e.target.value)}
                   className="form-input" />
               </div>
               <div>
-                <Label className="form-label">Definition</Label>
-                <textarea placeholder="Enter definition" value={newKeywordDef} onChange={(e) => setNewKeywordDef(e.target.value)}
+                <Label className="form-label">{t('keywords.defLabel')}</Label>
+                <textarea placeholder={t('keywords.defPH')} value={newKeywordDef} onChange={(e) => setNewKeywordDef(e.target.value)}
                   className="neon-textarea" style={{ minHeight: '100px' }} />
               </div>
               <Button onClick={handleAddKeyword} className="btn" style={{ alignSelf: 'flex-start' }}>
@@ -251,7 +251,7 @@ const Keywords = () => {
                   {searchTerm ? t('common.error') : t('keywords.emptyTitle')}
                 </div>
                 <p className="empty-state__desc">
-                  {searchTerm ? `Try a different search term` : t('keywords.emptyDesc')}
+                  {searchTerm ? t('keywords.tryDifferentSearch') : t('keywords.emptyDesc')}
                 </p>
               </div>
             ) : (

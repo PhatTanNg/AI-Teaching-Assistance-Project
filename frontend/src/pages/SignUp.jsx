@@ -2,9 +2,11 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import AuthForm from '../components/AuthForm.jsx';
 import { apiClient } from '../api/client.js';
+import { useLanguage } from '../context/LanguageContext.jsx';
 
 const SignUp = () => {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -18,7 +20,7 @@ const SignUp = () => {
       });
       navigate('/verify-email', { replace: true });
     } catch (err) {
-      setError(err.payload?.message ?? 'Unable to sign up. Please try again.');
+      setError(err.payload?.message ?? t('auth.signUpFailed'));
     } finally {
       setIsSubmitting(false);
     }
@@ -28,13 +30,13 @@ const SignUp = () => {
     <div className="auth-page">
       <AuthForm error={error} isSubmitting={isSubmitting} mode="signup" onSubmit={handleSubmit} />
       <p className="auth-footer" style={{ textAlign: 'center', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-        By signing up, you agree to our{' '}
-        <Link to="/terms" style={{ color: 'var(--text-muted)' }}>Terms of Service</Link>
-        {' '}and{' '}
-        <Link to="/privacy" style={{ color: 'var(--text-muted)' }}>Privacy Policy</Link>.
+        {t('auth.termsNotice')}{' '}
+        <Link to="/terms" style={{ color: 'var(--text-muted)' }}>{t('auth.termsLink')}</Link>
+        {' '}{t('auth.and')}{' '}
+        <Link to="/privacy" style={{ color: 'var(--text-muted)' }}>{t('auth.privacyLink')}</Link>.
       </p>
       <p className="auth-footer">
-        Already have an account? <Link to="/signin">Sign in</Link>
+        {t('auth.hasAccount')} <Link to="/signin">{t('auth.signIn')}</Link>
       </p>
     </div>
   );

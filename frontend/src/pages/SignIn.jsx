@@ -3,10 +3,12 @@ import { Link, useNavigate } from 'react-router-dom';
 import AuthForm from '../components/AuthForm.jsx';
 import { apiClient } from '../api/client.js';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useLanguage } from '../context/LanguageContext.jsx';
 
 const SignIn = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
+  const { t } = useLanguage();
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [sessionExpiredMsg, setSessionExpiredMsg] = useState('');
@@ -14,11 +16,11 @@ const SignIn = () => {
   useEffect(() => {
     try {
       if (sessionStorage.getItem('session_expired')) {
-        setSessionExpiredMsg('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+        setSessionExpiredMsg(t('auth.sessionExpired'));
         sessionStorage.removeItem('session_expired');
       }
     } catch (e) { /* ignore */ }
-  }, []);
+  }, [t]);
 
   const handleSubmit = async ({ usernameOrEmail, password }) => {
     setError('');
@@ -31,7 +33,7 @@ const SignIn = () => {
       login(response);
       navigate('/transcribe');
     } catch (err) {
-      setError(err.payload?.message ?? 'Unable to sign in. Please try again.');
+      setError(err.payload?.message ?? t('auth.signInFailed'));
     } finally {
       setIsSubmitting(false);
     }
@@ -46,11 +48,11 @@ const SignIn = () => {
       )}
       <AuthForm error={error} isSubmitting={isSubmitting} mode="signin" onSubmit={handleSubmit} />
       <p className="auth-footer" style={{ textAlign: 'center' }}>
-        <Link to="/forgot-password" style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Forgot password?</Link>
+        <Link to="/forgot-password" style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>{t('auth.forgotPassword')}</Link>
       </p>
       <p className="auth-footer">
-        Don&apos;t have an account?{' '}
-        <Link to="/signup">Create one</Link>
+        {t('auth.noAccount')}{' '}
+        <Link to="/signup">{t('auth.createAccount')}</Link>
       </p>
     </div>
   );

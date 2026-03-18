@@ -18,11 +18,11 @@ const ResetPassword = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (newPassword !== confirmPassword) {
-      setError('Passwords do not match');
+      setError(t('auth.passwordMismatch'));
       return;
     }
     if (newPassword.length < 6) {
-      setError('Password must be at least 6 characters');
+      setError(t('auth.passwordMinLength'));
       return;
     }
     setError('');
@@ -43,7 +43,7 @@ const ResetPassword = () => {
       <div className="auth-page">
         <div className="auth-card">
           <p style={{ color: 'var(--accent-red)', textAlign: 'center' }}>
-            Invalid reset link. Please request a new one.
+            {t('auth.invalidResetLink')}
           </p>
           <div style={{ textAlign: 'center', marginTop: '1rem' }}>
             <Link to="/forgot-password" className="btn btn--sm">{t('auth.forgotPassword')}</Link>
@@ -97,7 +97,7 @@ const ResetPassword = () => {
                 className="form-input"
                 value={newPassword}
                 onChange={e => setNewPassword(e.target.value)}
-                placeholder="Min. 6 characters"
+                placeholder={t('auth.minCharactersPH')}
                 required
                 minLength={6}
                 autoComplete="new-password"
@@ -110,7 +110,7 @@ const ResetPassword = () => {
                 className="form-input"
                 value={confirmPassword}
                 onChange={e => setConfirmPassword(e.target.value)}
-                placeholder="Repeat password"
+                placeholder={t('auth.repeatPasswordPH')}
                 required
                 autoComplete="new-password"
               />

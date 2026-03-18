@@ -90,14 +90,14 @@ const Home = () => {
       {/* ── Hero ── */}
       <section className="home__hero card card--wide" aria-labelledby="home-hero-title">
         <div className="home__eyebrow">
-          {isAuthenticated ? `✦ Welcome back, ${user?.displayName ?? user?.username}` : '✦ AI-powered lecture notes for every student'}
+          {isAuthenticated ? `${t('home.welcomeBack')} ${user?.displayName ?? user?.username}` : t('home.heroEyebrow')}
         </div>
         <h1 id="home-hero-title" className="home__title">
           {isAuthenticated ? (
             <>
-              Ready to{' '}
-              <span className="gradient-text">ace today's</span>{' '}
-              lecture?
+              {t('home.authenticatedHero')}
+              <span className="gradient-text">{t('home.authenticatedHeroAccent')}</span>
+              {t('home.authenticatedHeroSuffix')}
             </>
           ) : (
             <>
@@ -110,9 +110,7 @@ const Home = () => {
           )}
         </h1>
         <p className="home__subtitle">
-          {isAuthenticated
-            ? 'Record a lecture → AI extracts keywords → Study with flashcards & quizzes. Simple as that.'
-            : t('home.heroSub')}
+          {isAuthenticated ? t('home.authenticatedSubtitle') : t('home.heroSub')}
         </p>
         <div className="home__actions">
           {isAuthenticated ? (
@@ -152,9 +150,9 @@ const Home = () => {
 
         {!isAuthenticated && (
           <div className="home__stats">
-            <span className="home__stat-pill">🎙️ Real-time transcription</span>
-            <span className="home__stat-pill">🃏 Auto flashcards</span>
-            <span className="home__stat-pill">📝 MCQ quizzes</span>
+            <span className="home__stat-pill">{t('home.stat1')}</span>
+            <span className="home__stat-pill">{t('home.stat2')}</span>
+            <span className="home__stat-pill">{t('home.stat3')}</span>
           </div>
         )}
       </section>
