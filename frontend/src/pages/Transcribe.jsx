@@ -130,6 +130,7 @@ const Transcribe = () => {
         if (event.results[i].isFinal) finalChunk += piece + ' ';
         else interim += piece;
       }
+      console.log('[DEBUG] onresult fired — interim:', interim, '| final:', finalChunk);
 
       setInterimText(interim);
 
@@ -163,6 +164,7 @@ const Transcribe = () => {
     };
 
     recognition.onerror = (event) => {
+      console.log('[DEBUG] onerror:', event.error);
       // Ignore transient / expected errors — let onend handle restart
       const silent = ['no-speech', 'aborted', 'audio-capture'];
       if (silent.includes(event.error)) return;
@@ -282,6 +284,7 @@ const Transcribe = () => {
   /* ── Recording controls ── */
   const startRecording = () => {
     if (recognitionRef.current) {
+      isRecordingRef.current = true; // sync — if start() fails (still stopping), onend will restart
       try { recognitionRef.current.start(); } catch (_) {}
       setIsRecording(true);
       setTranscriptionStopped(false);
