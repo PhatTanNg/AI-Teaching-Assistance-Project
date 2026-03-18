@@ -6,18 +6,25 @@ const AuthForm = ({ mode = 'signin', onSubmit, isSubmitting, error }) => {
   const [formValues, setFormValues] = useState({
     usernameOrEmail: '',
     password: '',
+    confirmPassword: '',
     username: '',
     email: '',
     displayName: '',
   });
+  const [confirmError, setConfirmError] = useState('');
 
   const handleChange = (event) => {
     const { name, value } = event.target;
     setFormValues((prev) => ({ ...prev, [name]: value }));
+    if (name === 'confirmPassword' || name === 'password') setConfirmError('');
   };
 
   const handleSubmit = (event) => {
     event.preventDefault();
+    if (isSignUp && formValues.password !== formValues.confirmPassword) {
+      setConfirmError('Passwords do not match.');
+      return;
+    }
     onSubmit(formValues);
   };
 
@@ -81,6 +88,17 @@ const AuthForm = ({ mode = 'signin', onSubmit, isSubmitting, error }) => {
         placeholder="Your secure password" value={formValues.password}
         onChange={handleChange} required className="form-input"
         autoComplete={isSignUp ? 'new-password' : 'current-password'} />
+
+      {isSignUp && (
+        <>
+          <label className="form-label" htmlFor="confirmPassword">Confirm password</label>
+          <input id="confirmPassword" name="confirmPassword" type="password"
+            placeholder="Re-enter your password" value={formValues.confirmPassword}
+            onChange={handleChange} required className="form-input"
+            autoComplete="new-password" />
+          {confirmError && <p className="form-error" role="alert">{confirmError}</p>}
+        </>
+      )}
 
       {isSignUp && (
         <label style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start', cursor: 'pointer', marginTop: '0.25rem' }}>

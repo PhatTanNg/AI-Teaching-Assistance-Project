@@ -225,11 +225,11 @@ export const transcribeFile = async (token, audioFile, language = 'vi') => {
   return payload; // { transcript }
 };
 
-export const correctTranscript = async (token, text, language = 'vi') => {
+export const correctTranscript = async (token, text, language = 'vi', context = {}) => {
   const response = await fetch(`${baseUrl}/api/transcribe/correct`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ text, language }),
+    body: JSON.stringify({ text, language, ...context }),
     credentials: 'include',
   });
   const payload = await response.json().catch(() => ({}));

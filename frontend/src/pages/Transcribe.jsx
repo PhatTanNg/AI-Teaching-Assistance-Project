@@ -81,8 +81,12 @@ const Transcribe = () => {
   const correctedTextRef  = useRef('');
   const pendingChunksRef  = useRef([]);
   const chunkIdRef        = useRef(0);
+  const subjectRef        = useRef('');
+  const keywordsRef       = useRef([]);
 
   useEffect(() => { tokenRef.current = token; }, [token]);
+  useEffect(() => { subjectRef.current = subject; }, [subject]);
+  useEffect(() => { keywordsRef.current = keywords; }, [keywords]);
   const [isRecording, setIsRecording]                 = useState(false);
   const [rawTranscript, setRawTranscript]             = useState('');
   const [editedTranscript, setEditedTranscript]       = useState('');
@@ -145,7 +149,10 @@ const Transcribe = () => {
         };
 
         if (autoCorrectRef.current && raw.trim().split(/\s+/).length >= 5) {
-          correctTranscript(tokenRef.current, raw.trim(), transcribeLang)
+          correctTranscript(tokenRef.current, raw.trim(), transcribeLang, {
+            topic: subjectRef.current,
+            keywords: keywordsRef.current,
+          })
             .then(({ corrected }) => removePending(corrected + ' '))
             .catch(() => removePending(raw));
         } else {
@@ -155,9 +162,16 @@ const Transcribe = () => {
     };
 
     recognition.onerror = (event) => {
-      if (event.error === 'no-speech') return;
-      console.error('Speech recognition error:', event.error);
-      setIsRecording(false);
+      // Ignore transient / expected errors — let onend handle restart
+      const silent = ['no-speech', 'aborted', 'audio-capture'];
+      if (silent.includes(event.error)) return;
+      // Only stop for truly fatal errors (permission denied)
+      const fatal = ['not-allowed', 'service-not-allowed'];
+      if (fatal.includes(event.error)) {
+        console.error('Speech recognition fatal error:', event.error);
+        setIsRecording(false);
+      }
+      // network / other transient errors → isRecordingRef stays true → onend restarts
     };
 
     let stopping = false;
@@ -252,6 +266,18 @@ const Transcribe = () => {
     return () => { if (analysisTimerRef.current) clearTimeout(analysisTimerRef.current); };
   }, [rawTranscript, lastAnalyzedLength, analyzeTranscript, isRecording, demoMode]);
 
+  /* ── Periodic restart to prevent lag buildup in long sessions ── */
+  useEffect(() => {
+    if (!isRecording || demoMode) return;
+    const interval = setInterval(() => {
+      if (recognitionRef.current && isRecordingRef.current) {
+        try { recognitionRef.current.stop(); } catch (_) {}
+        // isRecordingRef stays true → onend will restart automatically
+      }
+    }, 25000); // restart every 25s
+    return () => clearInterval(interval);
+  }, [isRecording, demoMode]);
+
   /* ── Recording controls ── */
   const startRecording = () => {
     if (recognitionRef.current) {
@@ -316,7 +342,10 @@ const Transcribe = () => {
     if (!editedTranscript) return;
     setIsCorrectingFull(true);
     try {
-      const { corrected } = await correctTranscript(token, editedTranscript, transcribeLang);
+      const { corrected } = await correctTranscript(token, editedTranscript, transcribeLang, {
+        topic: subject,
+        keywords,
+      });
       if (corrected && corrected !== editedTranscript) {
         setCorrectionDiff({ original: editedTranscript, corrected });
       }

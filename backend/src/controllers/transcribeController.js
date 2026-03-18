@@ -144,13 +144,24 @@ const CORRECTION_PROMPTS = {
 
 export const correctTranscriptHandler = async (req, res) => {
   try {
-    const { text, language = 'vi' } = req.body;
+    const { text, language = 'vi', topic, keywords } = req.body;
     if (!text?.trim()) return res.status(400).json({ error: 'No text provided' });
 
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) return res.status(500).json({ error: 'OpenAI API key not configured' });
 
-    const systemPrompt = CORRECTION_PROMPTS[language] || CORRECTION_PROMPTS.en;
+    let systemPrompt = CORRECTION_PROMPTS[language] || CORRECTION_PROMPTS.en;
+
+    // Inject topic + keywords context to improve accuracy
+    const contextParts = [];
+    if (topic?.trim()) contextParts.push(`Chủ đề bài giảng: ${topic.trim()}`);
+    if (Array.isArray(keywords) && keywords.length > 0) {
+      const kwList = keywords.map(k => k.word).filter(Boolean).join(', ');
+      if (kwList) contextParts.push(`Các thuật ngữ chính: ${kwList}`);
+    }
+    if (contextParts.length > 0) {
+      systemPrompt += `\n\nNgữ cảnh:\n${contextParts.join('\n')}\nDùng ngữ cảnh trên để sửa đúng thuật ngữ chuyên ngành.`;
+    }
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
