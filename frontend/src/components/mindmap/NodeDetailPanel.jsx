@@ -13,7 +13,7 @@ export default function NodeDetailPanel({ node, onClose }) {
           📌 {node.label}
         </div>
         <button
-          className="mindmap-detail-panel__close"
+          className="btn-close"
           onClick={onClose}
           type="button"
           aria-label="Close"

@@ -266,9 +266,9 @@ const Keywords = () => {
                             <Button onClick={() => handleSaveDefinition(keyword._id)} size="sm" className="btn btn--sm">
                               <Save size={14} />
                             </Button>
-                            <Button onClick={() => setEditingKeywordId(null)} size="sm" className="btn btn--ghost btn--sm">
-                              <X size={14} />
-                            </Button>
+                            <button onClick={() => setEditingKeywordId(null)} className="btn-close btn-close--sm" type="button" aria-label="Huỷ">
+                              <X size={12} />
+                            </button>
                           </>
                         ) : (
                           <>

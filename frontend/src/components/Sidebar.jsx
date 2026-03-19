@@ -80,53 +80,61 @@ export default function Sidebar({ collapsed = false, onCollapse }) {
         {/* Footer */}
         <div className="sidebar__footer">
           {/* Controls: avatar + name + theme toggle */}
-          <div
-            className="sidebar__controls"
-            style={collapsed ? { flexDirection: 'column', alignItems: 'center', gap: '0.4rem' } : {}}
-          >
-            <NavLink
-              to="/profile"
-              className="sidebar__avatar"
-              title={collapsed ? `${displayName} — ${t('nav.profile')}` : t('nav.profile')}
-              aria-label={`${t('nav.profile')}: ${displayName}`}
-              style={{ textDecoration: 'none' }}
-            >
-              {isRiveAvatar ? (
-                <RiveAvatar artboard={user.avatarUrl.replace('rive:', '')} size="full" />
-              ) : isImageAvatar ? (
-                <img src={user.avatarUrl} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
-              ) : isEmojiAvatar ? (
-                <span style={{ fontSize: '1.3rem', lineHeight: 1 }}>{user.avatarUrl}</span>
-              ) : initials}
-            </NavLink>
-            {!collapsed && (
-              <NavLink to="/profile" style={{ textDecoration: 'none', flex: 1, minWidth: 0 }}>
-                <span className="sidebar__user-name">
-                  {displayName}
-                </span>
+          {collapsed ? (
+            <div className="sidebar__controls" style={{ flexDirection: 'column', alignItems: 'center', gap: '0.4rem' }}>
+              <NavLink
+                to="/profile"
+                className="sidebar__avatar"
+                title={`${displayName} — ${t('nav.profile')}`}
+                aria-label={`${t('nav.profile')}: ${displayName}`}
+                style={{ textDecoration: 'none' }}
+              >
+                {isRiveAvatar ? (
+                  <RiveAvatar artboard={user.avatarUrl.replace('rive:', '')} size="full" />
+                ) : isImageAvatar ? (
+                  <img src={user.avatarUrl} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                ) : isEmojiAvatar ? (
+                  <span style={{ fontSize: '1.3rem', lineHeight: 1 }}>{user.avatarUrl}</span>
+                ) : initials}
               </NavLink>
-            )}
-            <button
-              className="sidebar__theme-btn"
-              onClick={() => setLang(lang === 'vi' ? 'en' : 'vi')}
-              title={lang === 'vi' ? 'Switch to English' : 'Chuyển sang Tiếng Việt'}
-              type="button"
-              aria-label={lang === 'vi' ? 'Switch to English' : 'Chuyển sang Tiếng Việt'}
-              style={{ fontSize: '13px', fontWeight: 600 }}
-            >
-              {lang === 'vi' ? '🇬🇧' : '🇻🇳'}
-            </button>
-            <button
-              className="sidebar__theme-btn"
-              onClick={toggleTheme}
-              title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-              type="button"
-              aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-              style={collapsed ? {} : { marginLeft: 'auto' }}
-            >
-              {isDark ? <Sun size={15} /> : <Moon size={15} />}
-            </button>
-          </div>
+              <button className="sidebar__icon-btn" onClick={() => setLang(lang === 'vi' ? 'en' : 'vi')} type="button" title={lang === 'vi' ? 'Switch to English' : 'Chuyển sang Tiếng Việt'}>
+                {lang === 'vi' ? 'EN' : 'VN'}
+              </button>
+              <button className="sidebar__theme-btn" onClick={toggleTheme} type="button" title={isDark ? 'Light mode' : 'Dark mode'}>
+                {isDark ? <Sun size={14} /> : <Moon size={14} />}
+              </button>
+            </div>
+          ) : (
+            <div className="sidebar__controls">
+              <NavLink
+                to="/profile"
+                className="sidebar__avatar"
+                title={t('nav.profile')}
+                aria-label={`${t('nav.profile')}: ${displayName}`}
+                style={{ textDecoration: 'none' }}
+              >
+                {isRiveAvatar ? (
+                  <RiveAvatar artboard={user.avatarUrl.replace('rive:', '')} size="full" />
+                ) : isImageAvatar ? (
+                  <img src={user.avatarUrl} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                ) : isEmojiAvatar ? (
+                  <span style={{ fontSize: '1.3rem', lineHeight: 1 }}>{user.avatarUrl}</span>
+                ) : initials}
+              </NavLink>
+              <NavLink to="/profile" style={{ textDecoration: 'none', flex: 1, minWidth: 0 }}>
+                <span className="sidebar__user-name">{displayName}</span>
+                {user?.email && <span className="sidebar__user-sub">{user.email}</span>}
+              </NavLink>
+              <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center', flexShrink: 0 }}>
+                <button className="sidebar__icon-btn" onClick={() => setLang(lang === 'vi' ? 'en' : 'vi')} type="button" title={lang === 'vi' ? 'Switch to English' : 'Chuyển sang Tiếng Việt'} aria-label={lang === 'vi' ? 'Switch to English' : 'Chuyển sang Tiếng Việt'}>
+                  {lang === 'vi' ? 'EN' : 'VN'}
+                </button>
+                <button className="sidebar__icon-btn" onClick={toggleTheme} type="button" title={isDark ? 'Light mode' : 'Dark mode'} aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}>
+                  {isDark ? <Sun size={13} /> : <Moon size={13} />}
+                </button>
+              </div>
+            </div>
+          )}
 
           {!collapsed ? (
             <button className="sidebar__logout" onClick={logout} type="button">

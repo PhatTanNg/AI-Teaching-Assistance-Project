@@ -54,6 +54,7 @@ const Transcripts = () => {
   const [notesLoading, setNotesLoading] = useState(false);
   const [notesError, setNotesError] = useState('');
   const [notesRegenerating, setNotesRegenerating] = useState(false);
+  const [notesExpanded, setNotesExpanded] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -92,9 +93,9 @@ const Transcripts = () => {
   const startEdit = (field, text) => { setEditingField(field); setEditingText(text); };
   const cancelEdit = () => { setEditingField(null); setEditingText(''); };
 
-  // Fetch notes when Notes tab is opened
+  // Fetch notes when notes section is expanded
   useEffect(() => {
-    if (activeTab !== 'notes' || !selectedTranscript?._id || !token) return;
+    if (!notesExpanded || !selectedTranscript?._id || !token) return;
     if (notes !== null) return; // already fetched
     setNotesLoading(true);
     setNotesError('');
@@ -105,13 +106,14 @@ const Transcripts = () => {
         else setNotesError(t('common.error') || 'Lỗi tải ghi chú');
       })
       .finally(() => setNotesLoading(false));
-  }, [activeTab, selectedTranscript, token]);
+  }, [notesExpanded, selectedTranscript, token]);
 
   // Reset notes state when a new transcript is opened
   useEffect(() => {
     setNotes(null);
     setNotesError('');
     setNotesRegenerating(false);
+    setNotesExpanded(false);
   }, [selectedTranscript?._id]);
 
   const handleRegenerateNotes = async () => {
@@ -278,7 +280,7 @@ const Transcripts = () => {
                     padding: '0.25rem',
                     flex: 1,
                     display: 'grid',
-                    gridTemplateColumns: '1fr 1fr 1fr 1fr',
+                    gridTemplateColumns: '1fr 1fr 1fr',
                     gap: '0.25rem',
                   }}>
                     <TabsTrigger value="transcript">
@@ -291,17 +293,6 @@ const Transcripts = () => {
                         <span style={{
                           fontSize: '0.65rem', background: 'rgba(252,211,77,0.2)',
                           color: 'var(--accent-yellow)', padding: '1px 5px', borderRadius: '999px',
-                          marginLeft: '0.25rem',
-                        }}>...</span>
-                      )}
-                    </TabsTrigger>
-                    <TabsTrigger value="notes">
-                      <BookOpen size={13} />
-                      {t('transcripts.notesLabel') || 'Notes'}
-                      {notes === null && activeTab === 'notes' && (
-                        <span style={{
-                          fontSize: '0.65rem', background: 'rgba(110,231,247,0.2)',
-                          color: 'var(--accent-primary)', padding: '1px 5px', borderRadius: '999px',
                           marginLeft: '0.25rem',
                         }}>...</span>
                       )}
@@ -354,9 +345,9 @@ const Transcripts = () => {
                         <Button onClick={handleSaveEdit} disabled={isSaving} className="btn btn--sm">
                           <Save size={14} /> {isSaving ? t('common.loading') : t('transcripts.saveEdit')}
                         </Button>
-                        <Button onClick={cancelEdit} className="btn btn--ghost btn--sm">
-                          <X size={14} />
-                        </Button>
+                        <button onClick={cancelEdit} className="btn-close btn-close--sm" type="button" aria-label="Huỷ">
+                          <X size={12} />
+                        </button>
                       </div>
                     </div>
                   ) : (
@@ -380,9 +371,9 @@ const Transcripts = () => {
                         <Button onClick={handleSaveEdit} disabled={isSaving} className="btn btn--sm">
                           <Save size={14} /> {isSaving ? t('common.loading') : t('transcripts.saveEdit')}
                         </Button>
-                        <Button onClick={cancelEdit} className="btn btn--ghost btn--sm">
-                          <X size={14} />
-                        </Button>
+                        <button onClick={cancelEdit} className="btn-close btn-close--sm" type="button" aria-label="Huỷ">
+                          <X size={12} />
+                        </button>
                       </div>
                     </div>
                   ) : selectedTranscript.summary ? (
@@ -402,62 +393,81 @@ const Transcripts = () => {
                       </p>
                     </div>
                   )}
-                </TabsContent>
-                {/* Notes tab */}
-                <TabsContent value="notes" style={{ marginTop: '0.75rem', minHeight: 0, overflowY: 'auto' }}>
-                  {notesLoading ? (
-                    <div className="transcript-dialog__generating">
-                      <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🔍</div>
-                      <p style={{ fontWeight: 600, marginBottom: '0.25rem', color: 'var(--text-primary)' }}>
-                        {t('transcripts.notesGenerating') || 'Đang nghiên cứu và soạn ghi chú...'}
-                      </p>
-                      <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                        {t('transcripts.notesGeneratingDesc') || 'AI đang tra cứu tài liệu trên internet để bổ sung kiến thức cho bạn.'}
-                      </p>
-                    </div>
-                  ) : notesError ? (
-                    <div className="transcript-dialog__generating">
-                      <p style={{ color: 'var(--accent-red)', marginBottom: '0.75rem' }}>{notesError}</p>
-                      <button className="btn btn--sm" onClick={handleRegenerateNotes}>Thử lại</button>
-                    </div>
-                  ) : notes ? (
-                    <div className="transcript-dialog__summary-box">
-                      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.5rem' }}>
-                        <button
-                          className="btn btn--ghost btn--sm"
-                          onClick={handleRegenerateNotes}
-                          disabled={notesRegenerating}
-                          style={{ fontSize: '0.75rem' }}
-                        >
-                          <RefreshCw size={12} /> {notesRegenerating ? 'Đang tạo lại...' : (t('transcripts.notesRegenerate') || 'Tạo lại')}
-                        </button>
-                      </div>
-                      <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
-                        {notes}
-                      </ReactMarkdown>
-                    </div>
-                  ) : notesRegenerating ? (
-                    <div className="transcript-dialog__generating">
-                      <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🔍</div>
-                      <p style={{ fontWeight: 600, marginBottom: '0.25rem', color: 'var(--text-primary)' }}>
-                        {t('transcripts.notesGenerating') || 'Đang nghiên cứu và soạn ghi chú...'}
-                      </p>
-                      <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                        {t('transcripts.notesGeneratingDesc') || 'Quá trình này mất khoảng 30–60 giây.'}
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="transcript-dialog__generating">
-                      <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📝</div>
-                      <p style={{ fontWeight: 600, marginBottom: '0.25rem', color: 'var(--text-primary)' }}>
-                        {t('transcripts.notesNotReady') || 'Chưa có ghi chú chi tiết'}
-                      </p>
-                      <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
-                        {t('transcripts.notesNotReadyDesc') || 'Nếu bản ghi âm vừa được lưu, ghi chú đang được tạo tự động. Hoặc bấm nút bên dưới để tạo ngay.'}
-                      </p>
-                      <button className="btn btn--sm" onClick={handleRegenerateNotes}>
-                        <BookOpen size={14} /> {t('transcripts.notesGenerate') || 'Tạo ghi chú'}
+
+                  {/* Inline notes section */}
+                  {editingField !== 'summary' && (
+                    <div style={{ marginTop: '1.25rem', borderTop: '1px solid var(--glass-border)', paddingTop: '1rem' }}>
+                      <button
+                        type="button"
+                        onClick={() => setNotesExpanded(v => !v)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: '0.5rem', width: '100%',
+                          background: 'transparent', border: 'none', cursor: 'pointer',
+                          color: 'var(--text-secondary)', fontSize: '0.85rem', fontWeight: 600, padding: 0,
+                        }}
+                      >
+                        <BookOpen size={14} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
+                        <span>{t('transcripts.notesLabel') || 'Ghi chú chi tiết'}</span>
+                        <span style={{ marginLeft: 'auto', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                          {notesExpanded ? '▲' : '▼'}
+                        </span>
                       </button>
+
+                      {notesExpanded && (
+                        <div style={{ marginTop: '0.75rem' }}>
+                          {notesLoading ? (
+                            <div className="transcript-dialog__generating" style={{ padding: '1.5rem 0' }}>
+                              <div style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>🔍</div>
+                              <p style={{ fontWeight: 600, marginBottom: '0.25rem', color: 'var(--text-primary)', fontSize: '0.9rem' }}>
+                                {t('transcripts.notesGenerating') || 'Đang nghiên cứu và soạn ghi chú...'}
+                              </p>
+                              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                                {t('transcripts.notesGeneratingDesc') || 'AI đang tra cứu tài liệu trên internet để bổ sung kiến thức cho bạn.'}
+                              </p>
+                            </div>
+                          ) : notesError ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.5rem' }}>
+                              <p style={{ color: 'var(--accent-red)', fontSize: '0.85rem' }}>{notesError}</p>
+                              <button className="btn btn--sm" onClick={handleRegenerateNotes}>Thử lại</button>
+                            </div>
+                          ) : notes ? (
+                            <div className="transcript-dialog__summary-box">
+                              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.5rem' }}>
+                                <button
+                                  className="btn btn--ghost btn--sm"
+                                  onClick={handleRegenerateNotes}
+                                  disabled={notesRegenerating}
+                                  style={{ fontSize: '0.75rem' }}
+                                >
+                                  <RefreshCw size={12} /> {notesRegenerating ? 'Đang tạo lại...' : (t('transcripts.notesRegenerate') || 'Tạo lại')}
+                                </button>
+                              </div>
+                              <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                                {notes}
+                              </ReactMarkdown>
+                            </div>
+                          ) : notesRegenerating ? (
+                            <div className="transcript-dialog__generating" style={{ padding: '1.5rem 0' }}>
+                              <div style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>🔍</div>
+                              <p style={{ fontWeight: 600, marginBottom: '0.25rem', color: 'var(--text-primary)', fontSize: '0.9rem' }}>
+                                {t('transcripts.notesGenerating') || 'Đang nghiên cứu và soạn ghi chú...'}
+                              </p>
+                              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                                {t('transcripts.notesGeneratingDesc') || 'Quá trình này mất khoảng 30–60 giây.'}
+                              </p>
+                            </div>
+                          ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.5rem' }}>
+                              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                                {t('transcripts.notesNotReadyDesc') || 'Chưa có ghi chú. Bấm nút bên dưới để tạo ngay.'}
+                              </p>
+                              <button className="btn btn--sm" onClick={handleRegenerateNotes}>
+                                <BookOpen size={14} /> {t('transcripts.notesGenerate') || 'Tạo ghi chú'}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
                 </TabsContent>

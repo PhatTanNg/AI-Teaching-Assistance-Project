@@ -151,20 +151,40 @@ const Transcribe = () => {
 
   // Detect speech API support once at mount
   const hasSpeechSupport = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
-  const isMobileDevice = /Mobi|Android/i.test(navigator.userAgent);
+  const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const isMobileDevice = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
   const [subject, setSubject]                       = useState('');
   const [isSaving, setIsSaving]                     = useState(false);
   const [saveError, setSaveError]                   = useState('');
   const [isSummarizing]                             = useState(false);
   const [transcriptionStopped, setTranscriptionStopped] = useState(false);
+  const [isEditingTranscript, setIsEditingTranscript] = useState(false);
+  const [showIOSFallbackModal, setShowIOSFallbackModal] = useState(false);
+  const [iosTranscribing, setIosTranscribing] = useState(false);
+
+  // iOS MediaRecorder refs
+  const mediaRecorderRef  = useRef(null);
+  const mediaStreamRef    = useRef(null);
+  const iosChunksRef      = useRef([]);
+  const iosIntervalRef    = useRef(null);
+  const transcribeLangRef = useRef(transcribeLang);
+  useEffect(() => { transcribeLangRef.current = transcribeLang; }, [transcribeLang]);
 
   useEffect(() => { subjectRef.current = subject; }, [subject]);
   useEffect(() => { keywordsRef.current = keywords; }, [keywords]);
 
-  // On iOS/browsers without SpeechRecognition, force upload mode
+  // On browsers without SpeechRecognition and not iOS (iOS uses MediaRecorder), force upload mode
   useEffect(() => {
-    if (!hasSpeechSupport) setInputMode('upload');
+    if (!hasSpeechSupport && !isIOS) setInputMode('upload');
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // iOS cleanup on unmount
+  useEffect(() => {
+    return () => {
+      clearInterval(iosIntervalRef.current);
+      mediaStreamRef.current?.getTracks().forEach(t => t.stop());
+    };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── Speech recognition setup (re-runs only when language changes) ── */
@@ -351,8 +371,98 @@ const Transcribe = () => {
     return () => clearInterval(interval);
   }, [isRecording, demoMode]);
 
+  /* ── iOS MediaRecorder recording ── */
+  const bindAndStartRecorder = (stream, mimeType) => {
+    const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
+    mediaRecorderRef.current = recorder;
+    iosChunksRef.current = [];
+
+    recorder.ondataavailable = (e) => {
+      if (e.data.size > 0) iosChunksRef.current.push(e.data);
+    };
+
+    recorder.onstop = async () => {
+      if (!iosChunksRef.current.length) {
+        // Restart if still recording (empty chunk)
+        if (isRecordingRef.current) bindAndStartRecorder(mediaStreamRef.current, mimeType);
+        return;
+      }
+      const blob = new Blob(iosChunksRef.current, { type: recorder.mimeType || 'audio/mp4' });
+      iosChunksRef.current = [];
+
+      try {
+        setIosTranscribing(true);
+        const ext = recorder.mimeType?.includes('webm') ? 'webm' : 'm4a';
+        const file = new File([blob], `chunk.${ext}`, { type: recorder.mimeType || 'audio/mp4' });
+        const { transcript } = await transcribeFile(tokenRef.current, file, transcribeLangRef.current);
+        if (transcript?.trim()) {
+          const updated = (correctedTextRef.current + ' ' + transcript).trim();
+          correctedTextRef.current = updated;
+          setCorrectedText(updated);
+          setEditedTranscript(updated);
+        }
+      } catch (err) {
+        console.error('[iOS] chunk transcription error:', err);
+      } finally {
+        setIosTranscribing(false);
+      }
+
+      // Restart recorder if still recording
+      if (isRecordingRef.current && mediaStreamRef.current) {
+        bindAndStartRecorder(mediaStreamRef.current, mimeType);
+      }
+    };
+
+    recorder.start();
+  };
+
+  const startIOSRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaStreamRef.current = stream;
+
+      const mimeType = MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4'
+        : MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm'
+        : '';
+
+      isRecordingRef.current = true;
+      bindAndStartRecorder(stream, mimeType);
+
+      // Flush every 8 seconds
+      iosIntervalRef.current = setInterval(() => {
+        if (isRecordingRef.current && mediaRecorderRef.current?.state === 'recording') {
+          mediaRecorderRef.current.stop(); // triggers onstop → send + restart
+        }
+      }, 8000);
+
+      setIsRecording(true);
+      setTranscriptionStopped(false);
+    } catch (err) {
+      console.error('[iOS] getUserMedia error:', err);
+      setShowIOSFallbackModal(true);
+    }
+  };
+
+  const stopIOSRecording = () => {
+    clearInterval(iosIntervalRef.current);
+    isRecordingRef.current = false;
+
+    if (mediaRecorderRef.current?.state === 'recording') {
+      mediaRecorderRef.current.stop(); // final chunk sent via onstop; won't restart since isRecordingRef=false
+    }
+
+    mediaStreamRef.current?.getTracks().forEach(t => t.stop());
+    mediaStreamRef.current = null;
+
+    setIsRecording(false);
+    setTranscriptionStopped(true);
+    setInterimText('');
+    setPendingChunks([]);
+  };
+
   /* ── Recording controls ── */
   const startRecording = () => {
+    if (isIOS) { startIOSRecording(); return; }
     if (recognitionRef.current) {
       isRecordingRef.current = true; // sync — if start() fails (still stopping), onend will restart
       try { recognitionRef.current.start(); } catch (_) {}
@@ -362,6 +472,7 @@ const Transcribe = () => {
   };
 
   const stopRecording = () => {
+    if (isIOS) { stopIOSRecording(); return; }
     isRecordingRef.current = false; // sync before stop — prevents onend from restarting
     clearTimeout(restartTimeoutRef.current);
     if (demoMode) {
@@ -555,6 +666,7 @@ const Transcribe = () => {
     if (!confirm(t('transcribe.clearConfirm'))) return;
     setRawTranscript(''); setEditedTranscript(''); setKeywords([]); setSubject('');
     setLastAnalyzedLength(0); setHoveredKeyword(null); setIsAnalyzing(false); setTranscriptionStopped(false);
+    setIsEditingTranscript(false);
     correctedTextRef.current = '';
     setCorrectedText(''); setPendingChunks([]); setInterimText('');
     setCorrectionDiff(null); setUploadFile(null);
@@ -650,8 +762,8 @@ const Transcribe = () => {
             ))}
           </div>
 
-          {/* Input mode — hidden on browsers without SpeechRecognition (e.g. iOS Safari) */}
-          {hasSpeechSupport && (
+          {/* Input mode — show for all except browsers with no speech support AND not iOS */}
+          {(hasSpeechSupport || isIOS) && (
             <>
               <div className="settings-divider" />
               <div style={{ display: 'flex', gap: '0.25rem' }}>
@@ -708,8 +820,14 @@ const Transcribe = () => {
                   <div className="recording-indicator">
                     <span className="recording-dot" />
                     {t('transcribe.recordingIndicator')}
-                    {isAnalyzing ? ` ${t('transcribe.extractingKeywords')}` : ''}
+                    {isIOS && iosTranscribing ? ' 🎙 Đang nhận dạng...' : ''}
+                    {!isIOS && isAnalyzing ? ` ${t('transcribe.extractingKeywords')}` : ''}
                   </div>
+                )}
+                {isIOS && isRecording && (
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '-0.25rem' }}>
+                    Kết quả sẽ hiển thị sau mỗi ~8 giây
+                  </p>
                 )}
 
                 {/* Transcript area */}
@@ -737,18 +855,38 @@ const Transcribe = () => {
                     )}
                   </div>
                 ) : (
-                  /* Before recording OR after stopping: always-visible editable textarea */
+                  /* Before recording OR after stopping */
                   <div>
                     <Label className="form-label">{t('transcribe.transcriptLabel')}</Label>
-                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
-                      {transcriptionStopped
-                        ? `💡 ${t('transcribe.editHint')}`
-                        : t('transcribe.typePasteHint')}
-                    </p>
-                    <textarea ref={transcriptAreaRef} value={editedTranscript} onChange={(e) => setEditedTranscript(e.target.value)}
-                      onDoubleClick={handleTextareaDoubleClick} onMouseUp={handleTextareaSelect}
-                      className="neon-textarea" style={{ minHeight: '300px', lineHeight: 1.8 }}
-                      placeholder={t('transcribe.textareaPH')} />
+                    {transcriptionStopped && editedTranscript && !isEditingTranscript ? (
+                      <>
+                        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
+                          ✏️ {t('transcribe.editHint')} — {t('transcribe.clickToEdit') || 'Nhấp để chỉnh sửa'}
+                        </p>
+                        <div
+                          className="transcript-display"
+                          style={{ minHeight: 200, lineHeight: 1.8, cursor: 'text', padding: '0.75rem 1rem' }}
+                          onClick={() => setIsEditingTranscript(true)}
+                        >
+                          {renderWithLatex(editedTranscript)}
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
+                          {transcriptionStopped ? `💡 ${t('transcribe.editHint')}` : t('transcribe.typePasteHint')}
+                        </p>
+                        <textarea ref={transcriptAreaRef} value={editedTranscript} onChange={(e) => setEditedTranscript(e.target.value)}
+                          onDoubleClick={handleTextareaDoubleClick} onMouseUp={handleTextareaSelect}
+                          className="neon-textarea" style={{ minHeight: '300px', lineHeight: 1.8 }}
+                          placeholder={t('transcribe.textareaPH')} />
+                        {transcriptionStopped && (
+                          <button type="button" className="btn btn--sm btn--ghost" onClick={() => setIsEditingTranscript(false)} style={{ marginTop: '0.5rem' }}>
+                            ✓ Xong
+                          </button>
+                        )}
+                      </>
+                    )}
                     {editedTranscript && keywords.length > 0 && (
                       <div className="transcript-preview" style={{ marginTop: '1rem' }}>
                         <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem', fontWeight: 600 }}>
@@ -819,13 +957,33 @@ const Transcribe = () => {
                 {transcriptionStopped && (
                   <div>
                     <Label className="form-label">{t('transcribe.transcriptLabel')}</Label>
-                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
-                      💡 {t('transcribe.editHint')}
-                    </p>
-                    <textarea ref={transcriptAreaRef} value={editedTranscript} onChange={(e) => setEditedTranscript(e.target.value)}
-                      onDoubleClick={handleTextareaDoubleClick} onMouseUp={handleTextareaSelect}
-                      className="neon-textarea" style={{ minHeight: '300px', lineHeight: 1.8 }}
-                      placeholder={t('transcribe.resultPlaceholder')} />
+                    {editedTranscript && !isEditingTranscript ? (
+                      <>
+                        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
+                          ✏️ {t('transcribe.editHint')} — {t('transcribe.clickToEdit') || 'Nhấp để chỉnh sửa'}
+                        </p>
+                        <div
+                          className="transcript-display"
+                          style={{ minHeight: 200, lineHeight: 1.8, cursor: 'text', padding: '0.75rem 1rem' }}
+                          onClick={() => setIsEditingTranscript(true)}
+                        >
+                          {renderWithLatex(editedTranscript)}
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
+                          💡 {t('transcribe.editHint')}
+                        </p>
+                        <textarea ref={transcriptAreaRef} value={editedTranscript} onChange={(e) => setEditedTranscript(e.target.value)}
+                          onDoubleClick={handleTextareaDoubleClick} onMouseUp={handleTextareaSelect}
+                          className="neon-textarea" style={{ minHeight: '300px', lineHeight: 1.8 }}
+                          placeholder={t('transcribe.resultPlaceholder')} />
+                        <button type="button" className="btn btn--sm btn--ghost" onClick={() => setIsEditingTranscript(false)} style={{ marginTop: '0.5rem' }}>
+                          ✓ Xong
+                        </button>
+                      </>
+                    )}
                     {editedTranscript && keywords.length > 0 && (
                       <div className="transcript-preview" style={{ marginTop: '1rem' }}>
                         <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem', fontWeight: 600 }}>
@@ -976,6 +1134,46 @@ const Transcribe = () => {
           )}
         </div>
       </div>
+
+      {/* iOS fallback modal */}
+      {showIOSFallbackModal && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem',
+        }}
+          onClick={() => setShowIOSFallbackModal(false)}
+        >
+          <div
+            className="card"
+            style={{ maxWidth: 360, width: '100%', padding: '1.5rem', position: 'relative' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              className="btn-close"
+              type="button"
+              aria-label="Đóng"
+              onClick={() => setShowIOSFallbackModal(false)}
+              style={{ position: 'absolute', top: '1rem', right: '1rem' }}
+            >
+              <X size={14} />
+            </button>
+            <div style={{ fontSize: '2rem', marginBottom: '0.75rem' }}>📱</div>
+            <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '0.5rem', color: 'var(--text-primary)' }}>
+              Không thể truy cập micro
+            </h3>
+            <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '1rem', lineHeight: 1.6 }}>
+              Thiết bị của bạn không cho phép ghi âm trực tiếp. Hãy thử dùng tính năng <strong>Upload</strong> để tải file âm thanh lên và nhận dạng.
+            </p>
+            <Button
+              className="btn"
+              style={{ width: '100%' }}
+              onClick={() => { setShowIOSFallbackModal(false); setInputMode('upload'); }}
+            >
+              <Upload size={16} /> Chuyển sang Upload
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

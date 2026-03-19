@@ -346,10 +346,8 @@ export default function MonkeyChat() {
                 </span>
               )}
             </div>
-            <button type="button" onClick={() => setIsOpen(false)}
-              style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '0.25rem', display: 'flex' }}
-              aria-label="Close">
-              <X size={16} />
+            <button type="button" className="btn-close" onClick={() => setIsOpen(false)} aria-label="Close">
+              <X size={15} />
             </button>
           </div>
 

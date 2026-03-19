@@ -50,8 +50,8 @@ export default function OnboardingModal({ onDismiss }) {
     <div className="onboarding-overlay" role="dialog" aria-modal="true" aria-label="Welcome tour">
       <div className="onboarding-card">
         {/* Close */}
-        <button className="onboarding-close" onClick={onDismiss} aria-label={t('onboarding.skip')} type="button">
-          <X size={16} />
+        <button className="onboarding-close btn-close" onClick={onDismiss} aria-label={t('onboarding.skip')} type="button">
+          <X size={15} />
         </button>
 
         {/* Step dots */}
