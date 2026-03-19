@@ -280,6 +280,24 @@ export const refresh = async (req, res) => {
   }
 };
 
+export const logout = async (req, res) => {
+  try {
+    const refreshToken = req.cookies?.refreshToken;
+    if (refreshToken) {
+      await Session.deleteOne({ refreshToken });
+    }
+    res.clearCookie('refreshToken', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+    });
+    return res.status(200).json({ message: 'Logged out' });
+  } catch (err) {
+    console.error('Error during logout:', err);
+    return res.status(500).json({ message: 'Server error' });
+  }
+};
+
 export const resendVerification = async (req, res) => {
   try {
     const { email } = req.body;

@@ -2,9 +2,11 @@ import Transcript from '../models/Transcript.js';
 import KeywordGroup from '../models/KeywordGroup.js';
 import Keyword from '../models/Keyword.js';
 import Summary from '../models/Summary.js';
+import Notes from '../models/Notes.js';
 import Lecture from '../models/Lecture.js';
 import StudySession from '../models/StudySession.js';
 import { generateSummary } from '../services/summaryService.js';
+import { generateNotes } from '../services/notesService.js';
 
 // ==================== TRANSCRIPT CONTROLLERS ====================
 
@@ -98,6 +100,26 @@ export const createTranscript = async (req, res) => {
             console.error('[SUMMARY] Failed to save Summary document:', e?.message || e);
           }
         }
+
+        // Generate detailed Notes (Cornell-style) with web research in parallel
+        generateNotes(rawTranscript.trim(), {
+          subject: subject.trim(),
+          date: new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+          targetLanguage: lang || '',
+        }).then(async (notesText) => {
+          try {
+            await Notes.create({
+              transcriptId: savedTranscript._id,
+              text: notesText,
+              sessionId: session._id,
+            });
+            console.log(`[NOTES] Created Notes for transcript ${savedTranscript._id}`);
+          } catch (e) {
+            console.error('[NOTES] Failed to save Notes document:', e?.message || e);
+          }
+        }).catch((e) => {
+          console.warn('[NOTES] generation failed:', e?.message || e);
+        });
 
         // GPT-based keyword extraction — only educational/technical terms, in the right language
         try {
@@ -777,5 +799,56 @@ export const deleteSummary = async (req, res) => {
   } catch (error) {
     console.error('Error deleting summary:', error);
     res.status(500).json({ error: 'Failed to delete summary', details: error.message });
+  }
+};
+
+// ==================== NOTES CONTROLLERS ====================
+
+export const getNotesByTranscript = async (req, res) => {
+  try {
+    const { transcriptId } = req.params;
+    const userId = req.userId;
+
+    // Verify the transcript belongs to this user
+    const transcript = await Transcript.findOne({ _id: transcriptId, userId });
+    if (!transcript) return res.status(404).json({ error: 'Transcript not found' });
+
+    const notes = await Notes.findOne({ transcriptId });
+    if (!notes) return res.status(404).json({ error: 'Notes not yet generated' });
+
+    res.json({ notes });
+  } catch (error) {
+    console.error('Error fetching notes:', error);
+    res.status(500).json({ error: 'Failed to fetch notes', details: error.message });
+  }
+};
+
+export const regenerateNotes = async (req, res) => {
+  try {
+    const { transcriptId } = req.params;
+    const userId = req.userId;
+
+    const transcript = await Transcript.findOne({ _id: transcriptId, userId });
+    if (!transcript) return res.status(404).json({ error: 'Transcript not found' });
+
+    res.json({ message: 'Notes generation started' });
+
+    // Regenerate in background
+    generateNotes(transcript.rawTranscript, {
+      subject: transcript.subject || '',
+      date: new Date(transcript.transcribedAt || transcript.createdAt).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+    }).then(async (notesText) => {
+      await Notes.findOneAndUpdate(
+        { transcriptId },
+        { text: notesText },
+        { upsert: true, new: true }
+      );
+      console.log(`[NOTES] Regenerated Notes for transcript ${transcriptId}`);
+    }).catch((e) => {
+      console.warn('[NOTES] Regeneration failed:', e?.message || e);
+    });
+  } catch (error) {
+    console.error('Error regenerating notes:', error);
+    res.status(500).json({ error: 'Failed to start notes regeneration', details: error.message });
   }
 };

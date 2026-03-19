@@ -102,7 +102,13 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    try {
+      await fetch(`${baseUrl}/api/auth/logout`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+    } catch (_) { /* ignore network errors — still clear local state */ }
     setToken(null);
     setUser(null);
     try {

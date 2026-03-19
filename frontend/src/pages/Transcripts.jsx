@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileText, Trash2, Calendar, Eye, Edit2, Save, X, BookOpen, AlignLeft, Sparkles, BarChart2, Download } from 'lucide-react';
+import { FileText, Trash2, Calendar, Eye, Edit2, Save, X, BookOpen, AlignLeft, Sparkles, BarChart2, Download, RefreshCw } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
@@ -24,6 +24,7 @@ import {
   getTranscripts,
   deleteTranscript,
   updateTranscriptText,
+  apiClient,
 } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import TranscriptVisualizer from '../components/TranscriptVisualizer';
@@ -48,6 +49,11 @@ const Transcripts = () => {
   const [editingText, setEditingText] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('transcript');
+
+  const [notes, setNotes] = useState(null);         // null = not fetched, '' = not found
+  const [notesLoading, setNotesLoading] = useState(false);
+  const [notesError, setNotesError] = useState('');
+  const [notesRegenerating, setNotesRegenerating] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -85,6 +91,38 @@ const Transcripts = () => {
 
   const startEdit = (field, text) => { setEditingField(field); setEditingText(text); };
   const cancelEdit = () => { setEditingField(null); setEditingText(''); };
+
+  // Fetch notes when Notes tab is opened
+  useEffect(() => {
+    if (activeTab !== 'notes' || !selectedTranscript?._id || !token) return;
+    if (notes !== null) return; // already fetched
+    setNotesLoading(true);
+    setNotesError('');
+    apiClient(`/api/content/transcripts/${selectedTranscript._id}/notes`, { method: 'GET', token })
+      .then(data => setNotes(data.notes?.text || ''))
+      .catch(err => {
+        if (err?.status === 404) setNotes('');
+        else setNotesError(t('common.error') || 'Lỗi tải ghi chú');
+      })
+      .finally(() => setNotesLoading(false));
+  }, [activeTab, selectedTranscript, token]);
+
+  // Reset notes state when a new transcript is opened
+  useEffect(() => {
+    setNotes(null);
+    setNotesError('');
+    setNotesRegenerating(false);
+  }, [selectedTranscript?._id]);
+
+  const handleRegenerateNotes = async () => {
+    if (!selectedTranscript?._id || !token) return;
+    setNotesRegenerating(true);
+    setNotes(null);
+    setNotesError('');
+    try {
+      await apiClient(`/api/content/transcripts/${selectedTranscript._id}/notes/regenerate`, { method: 'POST', token });
+    } catch { /* ignore — backend streams response */ }
+  };
 
   const handleSaveEdit = async () => {
     if (!editingText.trim()) { setError(t('common.textEmpty')); return; }
@@ -240,7 +278,7 @@ const Transcripts = () => {
                     padding: '0.25rem',
                     flex: 1,
                     display: 'grid',
-                    gridTemplateColumns: '1fr 1fr 1fr',
+                    gridTemplateColumns: '1fr 1fr 1fr 1fr',
                     gap: '0.25rem',
                   }}>
                     <TabsTrigger value="transcript">
@@ -253,6 +291,17 @@ const Transcripts = () => {
                         <span style={{
                           fontSize: '0.65rem', background: 'rgba(252,211,77,0.2)',
                           color: 'var(--accent-yellow)', padding: '1px 5px', borderRadius: '999px',
+                          marginLeft: '0.25rem',
+                        }}>...</span>
+                      )}
+                    </TabsTrigger>
+                    <TabsTrigger value="notes">
+                      <BookOpen size={13} />
+                      {t('transcripts.notesLabel') || 'Notes'}
+                      {notes === null && activeTab === 'notes' && (
+                        <span style={{
+                          fontSize: '0.65rem', background: 'rgba(110,231,247,0.2)',
+                          color: 'var(--accent-primary)', padding: '1px 5px', borderRadius: '999px',
                           marginLeft: '0.25rem',
                         }}>...</span>
                       )}
@@ -354,6 +403,65 @@ const Transcripts = () => {
                     </div>
                   )}
                 </TabsContent>
+                {/* Notes tab */}
+                <TabsContent value="notes" style={{ marginTop: '0.75rem', minHeight: 0, overflowY: 'auto' }}>
+                  {notesLoading ? (
+                    <div className="transcript-dialog__generating">
+                      <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🔍</div>
+                      <p style={{ fontWeight: 600, marginBottom: '0.25rem', color: 'var(--text-primary)' }}>
+                        {t('transcripts.notesGenerating') || 'Đang nghiên cứu và soạn ghi chú...'}
+                      </p>
+                      <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                        {t('transcripts.notesGeneratingDesc') || 'AI đang tra cứu tài liệu trên internet để bổ sung kiến thức cho bạn.'}
+                      </p>
+                    </div>
+                  ) : notesError ? (
+                    <div className="transcript-dialog__generating">
+                      <p style={{ color: 'var(--accent-red)', marginBottom: '0.75rem' }}>{notesError}</p>
+                      <button className="btn btn--sm" onClick={handleRegenerateNotes}>Thử lại</button>
+                    </div>
+                  ) : notes ? (
+                    <div className="transcript-dialog__summary-box">
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.5rem' }}>
+                        <button
+                          className="btn btn--ghost btn--sm"
+                          onClick={handleRegenerateNotes}
+                          disabled={notesRegenerating}
+                          style={{ fontSize: '0.75rem' }}
+                        >
+                          <RefreshCw size={12} /> {notesRegenerating ? 'Đang tạo lại...' : (t('transcripts.notesRegenerate') || 'Tạo lại')}
+                        </button>
+                      </div>
+                      <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                        {notes}
+                      </ReactMarkdown>
+                    </div>
+                  ) : notesRegenerating ? (
+                    <div className="transcript-dialog__generating">
+                      <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🔍</div>
+                      <p style={{ fontWeight: 600, marginBottom: '0.25rem', color: 'var(--text-primary)' }}>
+                        {t('transcripts.notesGenerating') || 'Đang nghiên cứu và soạn ghi chú...'}
+                      </p>
+                      <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                        {t('transcripts.notesGeneratingDesc') || 'Quá trình này mất khoảng 30–60 giây.'}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="transcript-dialog__generating">
+                      <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📝</div>
+                      <p style={{ fontWeight: 600, marginBottom: '0.25rem', color: 'var(--text-primary)' }}>
+                        {t('transcripts.notesNotReady') || 'Chưa có ghi chú chi tiết'}
+                      </p>
+                      <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+                        {t('transcripts.notesNotReadyDesc') || 'Nếu bản ghi âm vừa được lưu, ghi chú đang được tạo tự động. Hoặc bấm nút bên dưới để tạo ngay.'}
+                      </p>
+                      <button className="btn btn--sm" onClick={handleRegenerateNotes}>
+                        <BookOpen size={14} /> {t('transcripts.notesGenerate') || 'Tạo ghi chú'}
+                      </button>
+                    </div>
+                  )}
+                </TabsContent>
+
                 {/* Visualize tab */}
                 <TabsContent value="visualize" style={{ marginTop: '0.75rem', flex: 1, minHeight: 0, overflowY: 'auto' }}>
                   <TranscriptVisualizer

@@ -137,9 +137,9 @@ export const transcribeWithWhisper = async (req, res) => {
 
 // ── GPT AI Correction ─────────────────────────────────────────────────────────
 const CORRECTION_PROMPTS = {
-  vi: 'Bạn đang sửa bản ghi âm bài giảng tiếng Việt. Hãy sửa lỗi chính tả, thêm dấu câu đúng chỗ, sửa các thuật ngữ chuyên ngành bị nghe nhầm, và điền từ bị thiếu dựa vào ngữ cảnh. Chỉ trả về văn bản đã sửa, không giải thích.',
-  en: 'You are correcting an English lecture transcript. Fix spelling errors, add proper punctuation, correct technical terms that were misheard, and fill in obviously missing words based on context. Return only the corrected text, no explanations.',
-  ga: 'Tá tú ag ceartú tras-scríbhinne léachta i nGaeilge. Ceartaigh botúin litrithe, cuir poncaíocht cheart leis, ceartaigh téarmaí teicniúla a cloiseadh mícheart, agus líon focal ar iarraidh. Ná seol ach an téacs ceartaithe ar ais.',
+  vi: 'Bạn đang sửa bản ghi âm bài giảng tiếng Việt. Hãy sửa lỗi chính tả, thêm dấu câu đúng chỗ, sửa các thuật ngữ chuyên ngành bị nghe nhầm, và điền từ bị thiếu dựa vào ngữ cảnh. Nếu văn bản chứa công thức toán học, hãy định dạng chúng bằng ký hiệu LaTeX: $công thức inline$ hoặc $$công thức block$$. Chỉ trả về văn bản đã sửa, không giải thích.',
+  en: 'You are correcting an English lecture transcript. Fix spelling errors, add proper punctuation, correct technical terms that were misheard, and fill in obviously missing words based on context. If the text contains mathematical formulas or equations, format them using LaTeX notation: $inline formula$ or $$block formula$$. Return only the corrected text, no explanations.',
+  ga: 'Tá tú ag ceartú tras-scríbhinne léachta i nGaeilge. Ceartaigh botúin litrithe, cuir poncaíocht cheart leis, ceartaigh téarmaí teicniúla a cloiseadh mícheart, agus líon focal ar iarraidh. Má tá foirmlí matamaitice sa téacs, úsáid nodaireacht LaTeX: $foirmle inline$ nó $$foirmle bloc$$. Ná seol ach an téacs ceartaithe ar ais.',
 };
 
 export const correctTranscriptHandler = async (req, res) => {

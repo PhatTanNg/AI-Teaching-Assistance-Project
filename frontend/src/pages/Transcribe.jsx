@@ -10,6 +10,8 @@ import { createTranscript, createKeywords, transcribeFile, correctTranscript, ap
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import PageHint from '../components/PageHint';
+import katex from 'katex';
+import 'katex/dist/katex.min.css';
 
 // Demo lecture data with keywords
 const DEMO_LECTURE = [
@@ -53,6 +55,46 @@ const DEMO_LECTURE = [
 
 const LANG_LOCALES = { vi: 'vi-VN', en: 'en-IE' };
 const LANG_LABELS  = { vi: '🇻🇳 Tiếng Việt', en: '🇬🇧 English' };
+
+/** Render text with inline and block LaTeX formulas using KaTeX */
+function renderWithLatex(text) {
+  if (!text) return null;
+  // Split on $$block$$ first, then $inline$
+  const parts = [];
+  let remaining = text;
+  let key = 0;
+  // Block math: $$...$$
+  const blockRe = /\$\$([^$]+)\$\$/g;
+  let lastIdx = 0;
+  let m;
+  while ((m = blockRe.exec(text)) !== null) {
+    if (m.index > lastIdx) parts.push(<span key={key++}>{text.slice(lastIdx, m.index)}</span>);
+    try {
+      const html = katex.renderToString(m[1].trim(), { displayMode: true, throwOnError: false });
+      parts.push(<span key={key++} dangerouslySetInnerHTML={{ __html: html }} />);
+    } catch (_) {
+      parts.push(<span key={key++}>{m[0]}</span>);
+    }
+    lastIdx = m.index + m[0].length;
+  }
+  remaining = text.slice(lastIdx);
+
+  // Inline math: $...$
+  const inlineParts = remaining.split(/\$([^$\n]+)\$/g);
+  inlineParts.forEach((part, i) => {
+    if (i % 2 === 0) {
+      if (part) parts.push(<span key={key++}>{part}</span>);
+    } else {
+      try {
+        const html = katex.renderToString(part.trim(), { displayMode: false, throwOnError: false });
+        parts.push(<span key={key++} dangerouslySetInnerHTML={{ __html: html }} />);
+      } catch (_) {
+        parts.push(<span key={key++}>${part}$</span>);
+      }
+    }
+  });
+  return parts.length ? parts : text;
+}
 
 const Transcribe = () => {
   const navigate = useNavigate();
@@ -98,13 +140,18 @@ const Transcribe = () => {
   const [lastAnalyzedLength, setLastAnalyzedLength]   = useState(0);
   const [hoveredKeyword, setHoveredKeyword]           = useState(null);
 
-  const recognitionRef    = useRef(null);
-  const demoIntervalRef   = useRef(null);
-  const analysisTimerRef  = useRef(null);
-  const isRecordingRef    = useRef(false);
-  const isAnalyzingRef    = useRef(false);
+  const recognitionRef      = useRef(null);
+  const demoIntervalRef     = useRef(null);
+  const analysisTimerRef    = useRef(null);
+  const isRecordingRef      = useRef(false);
+  const isAnalyzingRef      = useRef(false);
+  const restartTimeoutRef   = useRef(null);
   useEffect(() => { isRecordingRef.current = isRecording; }, [isRecording]);
   const [isRealtimeStreaming] = useState(false);
+
+  // Detect speech API support once at mount
+  const hasSpeechSupport = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+  const isMobileDevice = /Mobi|Android/i.test(navigator.userAgent);
 
   const [subject, setSubject]                       = useState('');
   const [isSaving, setIsSaving]                     = useState(false);
@@ -114,6 +161,11 @@ const Transcribe = () => {
 
   useEffect(() => { subjectRef.current = subject; }, [subject]);
   useEffect(() => { keywordsRef.current = keywords; }, [keywords]);
+
+  // On iOS/browsers without SpeechRecognition, force upload mode
+  useEffect(() => {
+    if (!hasSpeechSupport) setInputMode('upload');
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── Speech recognition setup (re-runs only when language changes) ── */
   useEffect(() => {
@@ -175,6 +227,7 @@ const Transcribe = () => {
       const fatal = ['not-allowed', 'service-not-allowed'];
       if (fatal.includes(event.error)) {
         console.error('Speech recognition fatal error:', event.error);
+        isRecordingRef.current = false;
         setIsRecording(false);
       }
       // network / other transient errors → isRecordingRef stays true → onend restarts
@@ -183,12 +236,23 @@ const Transcribe = () => {
     let stopping = false;
     recognition.onend = () => {
       if (isRecordingRef.current && !stopping) {
-        try { recognition.start(); } catch (_) {}
+        // Mobile browsers fire onend rapidly — debounce the restart to avoid race conditions
+        const delay = isMobileDevice ? 400 : 100;
+        clearTimeout(restartTimeoutRef.current);
+        restartTimeoutRef.current = setTimeout(() => {
+          if (isRecordingRef.current && !stopping) {
+            try { recognition.start(); } catch (_) {}
+          }
+        }, delay);
       }
     };
 
     recognitionRef.current = recognition;
-    return () => { stopping = true; recognition.stop(); };
+    return () => {
+      stopping = true;
+      clearTimeout(restartTimeoutRef.current);
+      recognition.stop();
+    };
   }, [transcribeLang]); // intentionally excludes token + autoCorrect — use refs instead
 
   /* ── Demo mode ── */
@@ -299,6 +363,7 @@ const Transcribe = () => {
 
   const stopRecording = () => {
     isRecordingRef.current = false; // sync before stop — prevents onend from restarting
+    clearTimeout(restartTimeoutRef.current);
     if (demoMode) {
       setDemoMode(false);
       if (demoIntervalRef.current) clearInterval(demoIntervalRef.current);
@@ -585,22 +650,24 @@ const Transcribe = () => {
             ))}
           </div>
 
-          {/* Divider */}
-          <div className="settings-divider" />
-
-          {/* Input mode */}
-          <div style={{ display: 'flex', gap: '0.25rem' }}>
-            <button type="button"
-              className={`btn btn--sm${inputMode === 'live' ? '' : ' btn--ghost'}`}
-              onClick={() => setInputMode('live')} disabled={isRecording || isTranscribingFile}>
-              <Mic size={13} /> {t('transcribe.modeLive')}
-            </button>
-            <button type="button"
-              className={`btn btn--sm${inputMode === 'upload' ? '' : ' btn--ghost'}`}
-              onClick={() => setInputMode('upload')} disabled={isRecording || isTranscribingFile}>
-              <Upload size={13} /> {t('transcribe.modeUpload')}
-            </button>
-          </div>
+          {/* Input mode — hidden on browsers without SpeechRecognition (e.g. iOS Safari) */}
+          {hasSpeechSupport && (
+            <>
+              <div className="settings-divider" />
+              <div style={{ display: 'flex', gap: '0.25rem' }}>
+                <button type="button"
+                  className={`btn btn--sm${inputMode === 'live' ? '' : ' btn--ghost'}`}
+                  onClick={() => setInputMode('live')} disabled={isRecording || isTranscribingFile}>
+                  <Mic size={13} /> {t('transcribe.modeLive')}
+                </button>
+                <button type="button"
+                  className={`btn btn--sm${inputMode === 'upload' ? '' : ' btn--ghost'}`}
+                  onClick={() => setInputMode('upload')} disabled={isRecording || isTranscribingFile}>
+                  <Upload size={13} /> {t('transcribe.modeUpload')}
+                </button>
+              </div>
+            </>
+          )}
 
         </div>
       </div>
@@ -651,7 +718,7 @@ const Transcribe = () => {
                   <div className="transcript-display transcript-display--recording" onMouseUp={handleTextSelection}>
                     {correctedText || pendingChunks.length > 0 || interimText ? (
                       <>
-                        <span>{correctedText}</span>
+                        <span>{renderWithLatex(correctedText)}</span>
                         {pendingChunks.map(c => (
                           <span key={c.id} style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>
                             {c.raw}

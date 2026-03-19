@@ -25,25 +25,34 @@ function renderMarkdown(text) {
   const elements = [];
   let listItems = [];
   let listType = null;
+  let listStartNumber = 1;
   let key = 0;
 
   const flushList = () => {
     if (!listItems.length) return;
-    const Tag = listType === 'ol' ? 'ol' : 'ul';
-    elements.push(
-      <Tag key={key++} style={{ margin: '0.25rem 0', paddingLeft: '1.25rem' }}>
-        {listItems.map((li, j) => <li key={j}>{inlineMarkdown(li)}</li>)}
-      </Tag>
-    );
+    if (listType === 'ol') {
+      elements.push(
+        <ol key={key++} start={listStartNumber} style={{ margin: '0.25rem 0', paddingLeft: '1.25rem' }}>
+          {listItems.map((li, j) => <li key={j}>{inlineMarkdown(li)}</li>)}
+        </ol>
+      );
+    } else {
+      elements.push(
+        <ul key={key++} style={{ margin: '0.25rem 0', paddingLeft: '1.25rem' }}>
+          {listItems.map((li, j) => <li key={j}>{inlineMarkdown(li)}</li>)}
+        </ul>
+      );
+    }
     listItems = [];
     listType = null;
+    listStartNumber = 1;
   };
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const heading = line.match(/^#{1,3}\s+(.+)/);
     const ulItem  = line.match(/^[-*]\s+(.*)/);
-    const olItem  = line.match(/^\d+\.\s+(.*)/);
+    const olItem  = line.match(/^(\d+)\.\s+(.*)/);
 
     if (heading) {
       flushList();
@@ -54,8 +63,9 @@ function renderMarkdown(text) {
       listItems.push(ulItem[1]);
     } else if (olItem) {
       if (listType === 'ul') flushList();
+      if (!listItems.length) listStartNumber = parseInt(olItem[1], 10);
       listType = 'ol';
-      listItems.push(olItem[1]);
+      listItems.push(olItem[2]);
     } else if (line.trim() === '') {
       // Don't flush if the next non-blank line continues the same list type
       const nextLine = lines.slice(i + 1).find(l => l.trim() !== '');

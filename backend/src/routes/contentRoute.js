@@ -18,6 +18,8 @@ import {
   deleteSummary,
   createKeywords,
   getKeywordsBySession,
+  getNotesByTranscript,
+  regenerateNotes,
 } from '../controllers/contentController.js';
 
 const router = express.Router();
@@ -79,5 +81,9 @@ router.delete('/summaries/:summaryId', deleteSummary);
 // ------------------- KEYWORD LIST (by session) -------------------
 router.post('/keywords', createKeywords);
 router.get('/keywords', getKeywordsBySession);
+
+// ==================== NOTES ROUTES ====================
+router.get('/transcripts/:transcriptId/notes', getNotesByTranscript);
+router.post('/transcripts/:transcriptId/notes/regenerate', regenerateNotes);
 
 export default router;
