@@ -33,7 +33,8 @@
       "Read(//c/Program Files/**)",
       "Bash(\"C:/Users/jsngu/AppData/Local/npm-cache/_npx/6de2aa2fded2970c/node_modules/.bin/agent-browser\" --version)",
       "Bash(agent-browser --version)",
-      "Bash(/c/Users/jsngu/AppData/Roaming/npm/agent-browser --version)"
+      "Bash(/c/Users/jsngu/AppData/Roaming/npm/agent-browser --version)",
+      "Bash(grep -r \"\\\\\\\\\\\\\\\\\\(\" \"c:\\\\AITA-Project\\\\AI-Teaching-Assistance-Project\\\\frontend\")"
     ]
   }
 }

@@ -129,8 +129,6 @@ export const createTranscript = async (req, res) => {
           const extractKeywordsWithGPT = async (text) => {
             const apiKey = process.env.OPENAI_API_KEY;
             if (!apiKey || !text) return [];
-            const lang = detectLang(text);
-            const langLabel = lang === 'vi' ? 'Vietnamese' : 'English';
             try {
               const resp = await fetch('https://api.openai.com/v1/chat/completions', {
                 method: 'POST',
@@ -140,7 +138,7 @@ export const createTranscript = async (req, res) => {
                   messages: [
                     {
                       role: 'system',
-                      content: `You are an educational assistant. Extract 3–8 subject-specific technical or academic keywords from the transcript that a student would benefit from having defined. Ignore common conversational words, names, greetings, and filler words regardless of language. Return ONLY valid JSON: [{"keyword":"...","definition":"..."}]. Definitions must be in ${langLabel}.`
+                      content: `You are an educational assistant. Extract 3–8 subject-specific technical or academic keywords from the transcript that a student would benefit from having defined. Ignore common conversational words, names, greetings, and filler words regardless of language. Return ONLY valid JSON: [{"keyword":"...","definition":"..."}]. Write each definition in the same language as its keyword (English keyword → English definition, Vietnamese keyword → Vietnamese definition).`
                     },
                     { role: 'user', content: `Transcript:\n${text.substring(0, 4000)}` }
                   ],
@@ -440,7 +438,7 @@ export const createKeywords = async (req, res) => {
       const apiKey = process.env.OPENAI_API_KEY;
       if (!apiKey) return {};
 
-      const lang = detectLang(context);
+      const lang = detectLang(words.join(' '));
       const langLabel = lang === 'vi' ? 'Vietnamese' : 'English';
 
       const systemMsg = {
