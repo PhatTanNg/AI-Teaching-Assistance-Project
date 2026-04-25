@@ -92,6 +92,10 @@ const vi = {
     analyzing: 'Đang phân tích...',
     browserNotSupported: 'Trình duyệt không hỗ trợ ghi âm. Vui lòng dùng Chrome hoặc Edge.',
     pendingChunkHint: 'Đang sửa lỗi...',
+    done: 'Xong',
+    clickToEdit: 'Nhấp để chỉnh sửa',
+    autoCorrectOn: 'AI: Bật',
+    autoCorrectOff: 'AI: Tắt',
   },
   transcripts: {
     title: 'Bài ghi của tôi',

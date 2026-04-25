@@ -1831,6 +1831,27 @@ html.light .transcript-card:hover {
   margin-top: 0.875rem;
 }
 
+/* Correction modal two-column layout */
+.correction-modal-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.correction-modal-grid > div {
+  max-height: calc(70vh - 8rem);
+}
+@media (max-width: 640px) {
+  .correction-modal-grid {
+    grid-template-columns: 1fr;
+  }
+  .correction-modal-grid > div {
+    max-height: 32vh;
+  }
+}
+
 /* AI suggest banner (post-transcription) */
 .ai-suggest-banner {
   display: flex;

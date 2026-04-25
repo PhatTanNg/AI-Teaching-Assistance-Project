@@ -57,8 +57,12 @@ const LANG_LOCALES = { vi: 'vi-VN', en: 'en-IE' };
 const LANG_LABELS  = { vi: '🇻🇳 Tiếng Việt', en: '🇬🇧 English' };
 
 /** Render text with inline and block LaTeX formulas using KaTeX */
-function renderWithLatex(text) {
-  if (!text) return null;
+function renderWithLatex(rawText) {
+  if (!rawText) return null;
+  // Normalize \[...\] → $$...$$ and \(...\) → $...$ before processing
+  let text = rawText
+    .replace(/\\\[([\s\S]+?)\\\]/g, (_, m) => `$$${m}$$`)
+    .replace(/\\\(([\s\S]+?)\\\)/g, (_, m) => `$${m}$`);
   // Split on $$block$$ first, then $inline$
   const parts = [];
   let remaining = text;
@@ -118,17 +122,20 @@ const Transcribe = () => {
   const [interimText, setInterimText]       = useState('');
 
   // Refs for use inside async callbacks (avoids stale closures)
-  const tokenRef          = useRef(token);
-  const autoCorrectRef    = useRef(true);
-  const correctedTextRef  = useRef('');
-  const pendingChunksRef  = useRef([]);
-  const chunkIdRef        = useRef(0);
+  const tokenRef            = useRef(token);
+  const autoCorrectRef      = useRef(true);
+  const correctedTextRef    = useRef('');
+  const pendingChunksRef    = useRef([]);
+  const chunkIdRef          = useRef(0);
+  const flushedChunkIdsRef  = useRef(new Set());
   const subjectRef        = useRef('');
   const keywordsRef       = useRef([]);
   const subjectInputRef   = useRef(null);
   const transcriptAreaRef = useRef(null);
 
+  const [autoCorrect, setAutoCorrect] = useState(true);
   useEffect(() => { tokenRef.current = token; }, [token]);
+  useEffect(() => { autoCorrectRef.current = autoCorrect; }, [autoCorrect]);
   const [isRecording, setIsRecording]                 = useState(false);
   const [rawTranscript, setRawTranscript]             = useState('');
   const [editedTranscript, setEditedTranscript]       = useState('');
@@ -219,10 +226,16 @@ const Transcribe = () => {
         setRawTranscript(prev => prev + raw);
 
         const removePending = (text) => {
+          // If this chunk was already flushed as raw on stop, skip to avoid duplicates
+          if (flushedChunkIdsRef.current.has(id)) return;
           correctedTextRef.current += text;
           setCorrectedText(correctedTextRef.current);
           pendingChunksRef.current = pendingChunksRef.current.filter(c => c.id !== id);
           setPendingChunks([...pendingChunksRef.current]);
+          // Late onresult that fired after stopRecording — also surface in editedTranscript
+          if (!isRecordingRef.current) {
+            setEditedTranscript(prev => (prev ? prev + ' ' + text : text).trim());
+          }
         };
 
         if (autoCorrectRef.current && raw.trim().split(/\s+/).length >= 5) {
@@ -462,12 +475,27 @@ const Transcribe = () => {
 
   /* ── Recording controls ── */
   const startRecording = () => {
+    // Sync edited state → both ref AND state, so live display starts from the edited text
+    correctedTextRef.current = editedTranscript;
+    setCorrectedText(editedTranscript);
+    // Clear flushed set for fresh session
+    flushedChunkIdsRef.current.clear();
+    // Exit edit mode cleanly
+    setIsEditingTranscript(false);
     if (isIOS) { startIOSRecording(); return; }
     if (recognitionRef.current) {
-      isRecordingRef.current = true; // sync — if start() fails (still stopping), onend will restart
-      try { recognitionRef.current.start(); } catch (_) {}
+      // Flush any lingering previous session before starting fresh
+      try { recognitionRef.current.stop(); } catch (_) {}
+      isRecordingRef.current = true;
       setIsRecording(true);
       setTranscriptionStopped(false);
+      // Allow stop() to settle before calling start() — avoids Chrome "already started" bug
+      clearTimeout(restartTimeoutRef.current);
+      restartTimeoutRef.current = setTimeout(() => {
+        if (isRecordingRef.current) {
+          try { recognitionRef.current.start(); } catch (_) {}
+        }
+      }, 150);
     }
   };
 
@@ -486,6 +514,8 @@ const Transcribe = () => {
     setInterimText('');
 
     // Flush remaining pending chunks as raw (no correction)
+    // Mark their IDs so any in-flight corrections don't double-append
+    pendingChunksRef.current.forEach(c => flushedChunkIdsRef.current.add(c.id));
     const pendingRaw = pendingChunksRef.current.map(c => c.raw).join('');
     const full = (correctedTextRef.current + pendingRaw).trim();
     correctedTextRef.current = full;
@@ -668,6 +698,7 @@ const Transcribe = () => {
     setLastAnalyzedLength(0); setHoveredKeyword(null); setIsAnalyzing(false); setTranscriptionStopped(false);
     setIsEditingTranscript(false);
     correctedTextRef.current = '';
+    flushedChunkIdsRef.current.clear();
     setCorrectedText(''); setPendingChunks([]); setInterimText('');
     setCorrectionDiff(null); setUploadFile(null);
     pendingChunksRef.current = [];
@@ -781,6 +812,21 @@ const Transcribe = () => {
             </>
           )}
 
+          {/* AI auto-correct toggle — only relevant for live mode */}
+          {inputMode === 'live' && (hasSpeechSupport || isIOS) && (
+            <>
+              <div className="settings-divider" />
+              <button
+                type="button"
+                className={`btn btn--sm${autoCorrect ? '' : ' btn--ghost'}`}
+                onClick={() => setAutoCorrect(v => !v)}
+                disabled={isTranscribingFile}
+                title={autoCorrect ? 'AI correction is ON — disable for instant text' : 'AI correction is OFF — text appears immediately'}>
+                <Sparkles size={13} /> {autoCorrect ? t('transcribe.autoCorrectOn') : t('transcribe.autoCorrectOff')}
+              </button>
+            </>
+          )}
+
         </div>
       </div>
 
@@ -861,7 +907,7 @@ const Transcribe = () => {
                     {transcriptionStopped && editedTranscript && !isEditingTranscript ? (
                       <>
                         <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
-                          ✏️ {t('transcribe.editHint')} — {t('transcribe.clickToEdit') || 'Nhấp để chỉnh sửa'}
+                          ✏️ {t('transcribe.editHint')} — {t('transcribe.clickToEdit')}
                         </p>
                         <div
                           className="transcript-display"
@@ -876,13 +922,13 @@ const Transcribe = () => {
                         <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
                           {transcriptionStopped ? `💡 ${t('transcribe.editHint')}` : t('transcribe.typePasteHint')}
                         </p>
-                        <textarea ref={transcriptAreaRef} value={editedTranscript} onChange={(e) => setEditedTranscript(e.target.value)}
+                        <textarea ref={transcriptAreaRef} value={editedTranscript} onChange={(e) => { setEditedTranscript(e.target.value); correctedTextRef.current = e.target.value; }}
                           onDoubleClick={handleTextareaDoubleClick} onMouseUp={handleTextareaSelect}
                           className="neon-textarea" style={{ minHeight: '300px', lineHeight: 1.8 }}
                           placeholder={t('transcribe.textareaPH')} />
                         {transcriptionStopped && (
                           <button type="button" className="btn btn--sm btn--ghost" onClick={() => setIsEditingTranscript(false)} style={{ marginTop: '0.5rem' }}>
-                            ✓ Xong
+                            ✓ {t('transcribe.done')}
                           </button>
                         )}
                       </>
@@ -960,7 +1006,7 @@ const Transcribe = () => {
                     {editedTranscript && !isEditingTranscript ? (
                       <>
                         <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
-                          ✏️ {t('transcribe.editHint')} — {t('transcribe.clickToEdit') || 'Nhấp để chỉnh sửa'}
+                          ✏️ {t('transcribe.editHint')} — {t('transcribe.clickToEdit')}
                         </p>
                         <div
                           className="transcript-display"
@@ -975,12 +1021,12 @@ const Transcribe = () => {
                         <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
                           💡 {t('transcribe.editHint')}
                         </p>
-                        <textarea ref={transcriptAreaRef} value={editedTranscript} onChange={(e) => setEditedTranscript(e.target.value)}
+                        <textarea ref={transcriptAreaRef} value={editedTranscript} onChange={(e) => { setEditedTranscript(e.target.value); correctedTextRef.current = e.target.value; }}
                           onDoubleClick={handleTextareaDoubleClick} onMouseUp={handleTextareaSelect}
                           className="neon-textarea" style={{ minHeight: '300px', lineHeight: 1.8 }}
                           placeholder={t('transcribe.resultPlaceholder')} />
                         <button type="button" className="btn btn--sm btn--ghost" onClick={() => setIsEditingTranscript(false)} style={{ marginTop: '0.5rem' }}>
-                          ✓ Xong
+                          ✓ {t('transcribe.done')}
                         </button>
                       </>
                     )}
@@ -1017,36 +1063,7 @@ const Transcribe = () => {
               </div>
             )}
 
-            {/* ── AI Correction diff panel ── */}
-            {correctionDiff && (
-              <div className="correction-diff-panel">
-                <div className="correction-diff-panel__header">
-                  <span style={{ fontWeight: 700, fontSize: '0.8rem', color: 'var(--accent-primary)', letterSpacing: '0.02em' }}>
-                    ✨ {t('transcribe.correctionTitle')}
-                  </span>
-                  <button type="button" onClick={() => setCorrectionDiff(null)}
-                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '0.25rem', lineHeight: 1 }}>
-                    <X size={14} />
-                  </button>
-                </div>
-                <div style={{ maxHeight: '180px', overflowY: 'auto' }}>
-                  <div className="correction-diff-panel__before">
-                    {correctionDiff.original.slice(0, 300)}{correctionDiff.original.length > 300 ? '…' : ''}
-                  </div>
-                  <div className="correction-diff-panel__after">
-                    {correctionDiff.corrected.slice(0, 300)}{correctionDiff.corrected.length > 300 ? '…' : ''}
-                  </div>
-                </div>
-                <div className="correction-diff-panel__actions">
-                  <button type="button" className="btn btn--sm" onClick={acceptCorrection}>
-                    ✅ {t('transcribe.acceptCorrection')}
-                  </button>
-                  <button type="button" className="btn btn--ghost btn--sm" onClick={() => setCorrectionDiff(null)}>
-                    ↩ {t('transcribe.rejectCorrection')}
-                  </button>
-                </div>
-              </div>
-            )}
+            {/* ── AI Correction diff — shown as modal (see bottom of component) ── */}
 
             {/* ── AI correction suggestion (post-transcription) ── */}
             {transcriptionStopped && hasEnoughForCorrection && !correctionDiff && !isCorrectingFull && (
@@ -1171,6 +1188,71 @@ const Transcribe = () => {
             >
               <Upload size={16} /> Chuyển sang Upload
             </Button>
+          </div>
+        </div>
+      )}
+      {/* ── AI Correction diff modal ── */}
+      {correctionDiff && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
+          onClick={() => setCorrectionDiff(null)}
+        >
+          <div
+            className="card"
+            style={{ width: '100%', maxWidth: 820, maxHeight: '88vh', display: 'flex', flexDirection: 'column', position: 'relative', padding: '1.5rem', gap: '1rem' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+              <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <Sparkles size={16} /> ✨ {t('transcribe.correctionTitle')}
+              </span>
+              <button
+                className="btn-close"
+                type="button"
+                aria-label="Đóng"
+                onClick={() => setCorrectionDiff(null)}
+              >
+                <X size={14} />
+              </button>
+            </div>
+
+            {/* Two-column comparison */}
+            <div className="correction-modal-grid">
+              {/* Original */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', minWidth: 0 }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--accent-red)', letterSpacing: '0.05em', textTransform: 'uppercase', flexShrink: 0 }}>
+                  📄 Original
+                </div>
+                <div
+                  style={{ flex: 1, overflowY: 'auto', fontSize: '0.82rem', lineHeight: 1.7, padding: '0.75rem', borderRadius: '0.5rem', background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.15)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: 'var(--text-secondary)' }}
+                >
+                  {correctionDiff.original}
+                </div>
+              </div>
+
+              {/* Corrected */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', minWidth: 0 }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--accent-primary)', letterSpacing: '0.05em', textTransform: 'uppercase', flexShrink: 0 }}>
+                  ✨ Corrected
+                </div>
+                <div
+                  style={{ flex: 1, overflowY: 'auto', fontSize: '0.82rem', lineHeight: 1.7, padding: '0.75rem', borderRadius: '0.5rem', background: 'rgba(110,231,247,0.05)', border: '1px solid rgba(110,231,247,0.15)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: 'var(--text-primary)' }}
+                >
+                  {renderWithLatex(correctionDiff.corrected)}
+                </div>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', flexShrink: 0, flexWrap: 'wrap' }}>
+              <button type="button" className="btn btn--ghost btn--sm" onClick={() => setCorrectionDiff(null)}>
+                ↩ {t('transcribe.rejectCorrection')}
+              </button>
+              <button type="button" className="btn btn--sm" onClick={acceptCorrection}>
+                ✅ {t('transcribe.acceptCorrection')}
+              </button>
+            </div>
           </div>
         </div>
       )}

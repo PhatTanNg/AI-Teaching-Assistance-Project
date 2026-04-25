@@ -92,6 +92,10 @@ const en = {
     analyzing: 'Analysing...',
     pendingChunkHint: 'Correcting...',
     browserNotSupported: 'Browser does not support recording. Please use Chrome or Edge.',
+    done: 'Done',
+    clickToEdit: 'Click to edit',
+    autoCorrectOn: 'AI: On',
+    autoCorrectOff: 'AI: Off',
   },
   transcripts: {
     title: 'My Transcripts',
