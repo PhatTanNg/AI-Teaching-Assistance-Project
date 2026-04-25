@@ -123,38 +123,60 @@ export const createTranscript = async (req, res) => {
 
         // GPT-based keyword extraction — only educational/technical terms, in the right language
         try {
-          const detectLang = (text) =>
-            /[àáảãạăắặẳẵâầấẩẫậđèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹ]/i.test(text) ? 'vi' : 'en';
+          const isVietnamese = (text) =>
+            /[àáảãạăắặẳẵâầấẩẫậđèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹ]/i.test(text || '');
 
           const extractKeywordsWithGPT = async (text) => {
             const apiKey = process.env.OPENAI_API_KEY;
             if (!apiKey || !text) return [];
             try {
-              const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+              // Step 1: extract keyword texts only
+              const step1 = await fetch('https://api.openai.com/v1/chat/completions', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
                 body: JSON.stringify({
                   model: 'gpt-3.5-turbo',
                   messages: [
-                    {
-                      role: 'system',
-                      content: `You are an educational assistant. Extract 3–8 subject-specific technical or academic keywords from the transcript that a student would benefit from having defined. Ignore common conversational words, names, greetings, and filler words regardless of language. Return ONLY valid JSON: [{"keyword":"...","definition":"..."}]. Write each definition in the same language as its keyword (English keyword → English definition, Vietnamese keyword → Vietnamese definition).`
-                    },
+                    { role: 'system', content: 'You are an educational assistant. Extract 3–8 subject-specific technical or academic keywords from the transcript. Ignore common words, names, greetings, and filler. Return ONLY a JSON array of keyword strings, e.g. ["Keyword One","Keyword Two"]. No definitions.' },
                     { role: 'user', content: `Transcript:\n${text.substring(0, 4000)}` }
                   ],
                   temperature: 0,
-                  max_tokens: 600,
+                  max_tokens: 200,
                 }),
               });
-              if (!resp.ok) return [];
-              const data = await resp.json().catch(() => ({}));
-              const raw = data?.choices?.[0]?.message?.content?.trim() || '';
-              const first = raw.indexOf('['), last = raw.lastIndexOf(']');
-              if (first === -1 || last === -1) return [];
-              const parsed = JSON.parse(raw.slice(first, last + 1));
+              if (!step1.ok) return [];
+              const d1 = await step1.json().catch(() => ({}));
+              const raw1 = d1?.choices?.[0]?.message?.content?.trim() || '';
+              const f1 = raw1.indexOf('['), l1 = raw1.lastIndexOf(']');
+              if (f1 === -1 || l1 === -1) return [];
+              const keywordTexts = JSON.parse(raw1.slice(f1, l1 + 1)).filter(k => typeof k === 'string' && k.trim());
+
+              if (keywordTexts.length === 0) return [];
+
+              // Step 2: generate definitions with language matched to each keyword text
+              const langLabel = isVietnamese(keywordTexts.join(' ')) ? 'Vietnamese' : 'English';
+              const step2 = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+                body: JSON.stringify({
+                  model: 'gpt-3.5-turbo',
+                  messages: [
+                    { role: 'system', content: `You are a concise educational assistant. Write one-sentence definitions in ${langLabel}. Return ONLY valid JSON: [{"keyword":"...","definition":"..."}].` },
+                    { role: 'user', content: `Define each keyword in ${langLabel}: ${JSON.stringify(keywordTexts)}\n\nContext: ${text.substring(0, 2000)}` }
+                  ],
+                  temperature: 0,
+                  max_tokens: 500,
+                }),
+              });
+              if (!step2.ok) return keywordTexts.map(k => ({ keywordText: k, definition: '' }));
+              const d2 = await step2.json().catch(() => ({}));
+              const raw2 = d2?.choices?.[0]?.message?.content?.trim() || '';
+              const f2 = raw2.indexOf('['), l2 = raw2.lastIndexOf(']');
+              if (f2 === -1 || l2 === -1) return keywordTexts.map(k => ({ keywordText: k, definition: '' }));
+              const parsed = JSON.parse(raw2.slice(f2, l2 + 1));
               return Array.isArray(parsed)
                 ? parsed.filter(k => k?.keyword).map(k => ({ keywordText: k.keyword.trim(), definition: k.definition?.trim() || '' }))
-                : [];
+                : keywordTexts.map(k => ({ keywordText: k, definition: '' }));
             } catch { return []; }
           };
 
