@@ -153,6 +153,8 @@ const Transcribe = () => {
   const isRecordingRef      = useRef(false);
   const isAnalyzingRef      = useRef(false);
   const restartTimeoutRef   = useRef(null);
+  const networkRetryRef     = useRef(0);  // consecutive network error count → exponential backoff
+  const lastErrorRef        = useRef(null);
   useEffect(() => { isRecordingRef.current = isRecording; }, [isRecording]);
   const [isRealtimeStreaming] = useState(false);
 
@@ -205,6 +207,10 @@ const Transcribe = () => {
     recognition.lang          = LANG_LOCALES[transcribeLang] || 'vi-VN';
 
     recognition.onresult = (event) => {
+      // Successful speech data — reset network backoff counter
+      networkRetryRef.current = 0;
+      lastErrorRef.current = null;
+
       let finalChunk = '';
       let interim    = '';
       for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -262,15 +268,28 @@ const Transcribe = () => {
         console.error('Speech recognition fatal error:', event.error);
         isRecordingRef.current = false;
         setIsRecording(false);
+        return;
       }
-      // network / other transient errors → isRecordingRef stays true → onend restarts
+      // network error: count consecutive failures for exponential backoff in onend
+      if (event.error === 'network') {
+        networkRetryRef.current += 1;
+        lastErrorRef.current = 'network';
+      }
     };
 
     let stopping = false;
     recognition.onend = () => {
       if (isRecordingRef.current && !stopping) {
-        // Mobile browsers fire onend rapidly — debounce the restart to avoid race conditions
-        const delay = isMobileDevice ? 400 : 100;
+        // Exponential backoff for network errors: 1s → 2s → 4s → 8s max
+        // Normal restart: 150ms desktop / 400ms mobile (debounce for rapid-fire onend)
+        let delay;
+        if (lastErrorRef.current === 'network' && networkRetryRef.current > 0) {
+          delay = Math.min(1000 * Math.pow(2, networkRetryRef.current - 1), 8000);
+          console.log(`[DEBUG] network backoff delay: ${delay}ms (attempt ${networkRetryRef.current})`);
+        } else {
+          delay = isMobileDevice ? 400 : 150;
+        }
+        lastErrorRef.current = null; // consume — reset for next cycle
         clearTimeout(restartTimeoutRef.current);
         restartTimeoutRef.current = setTimeout(() => {
           if (isRecordingRef.current && !stopping) {
@@ -478,8 +497,10 @@ const Transcribe = () => {
     // Sync edited state → both ref AND state, so live display starts from the edited text
     correctedTextRef.current = editedTranscript;
     setCorrectedText(editedTranscript);
-    // Clear flushed set for fresh session
+    // Clear flushed set + network backoff state for fresh session
     flushedChunkIdsRef.current.clear();
+    networkRetryRef.current = 0;
+    lastErrorRef.current = null;
     // Exit edit mode cleanly
     setIsEditingTranscript(false);
     if (isIOS) { startIOSRecording(); return; }
@@ -699,6 +720,8 @@ const Transcribe = () => {
     setIsEditingTranscript(false);
     correctedTextRef.current = '';
     flushedChunkIdsRef.current.clear();
+    networkRetryRef.current = 0;
+    lastErrorRef.current = null;
     setCorrectedText(''); setPendingChunks([]); setInterimText('');
     setCorrectionDiff(null); setUploadFile(null);
     pendingChunksRef.current = [];
